@@ -5,6 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Application\QaStudio.Application.csproj" />
     <ProjectReference Include="..\Infrastructure\QaStudio.Infrastructure.csproj" />
+    <ProjectReference Include="..\ServiceDefaults\QaStudio.ServiceDefaults.csproj" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
     <PackageReference Include="Yarp.ReverseProxy" />
   </ItemGroup>

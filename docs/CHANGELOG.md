@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Aspire for development, with hot reload and tracing — 2026-11-13
+
+- **One command for developers:** `dotnet run --project Backend/src/AppHost` (or F5 on **QaStudio.AppHost**) starts the API, the
+  worker, the Vite dev server and, optionally, the voice agent and a SQL Server container. The Aspire dashboard
+  (http://localhost:15080) shows each one's state, console logs and health
+  ([adr/0012](adr/0012-aspire-for-development-and-observability.md)).
+- **Hot reload everywhere:** `dotnet watch` for the API (an IDE uses its own), `tsc --watch` + `node --watch` for the worker and
+  voice agent, Vite HMR for the web app.
+- **Distributed tracing:** OpenTelemetry in the API (`Backend/src/ServiceDefaults`) and the worker
+  (`services/qa-api/src/telemetry.ts`) joins one request into one trace across the API, the gateway and the worker. It is on only
+  when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so installs are unchanged.
+- **Installs are unchanged:** `qa-studio.cmd` and `npm start` start QA Studio as before. The Vite dev server now also reads
+  `PORT` (default 5173).
+
 ### Project-first navigation — 2026-11-09
 
 - **Choose a project first, like Azure DevOps.** The start page lists projects; nothing else is offered until one is open. Inside a

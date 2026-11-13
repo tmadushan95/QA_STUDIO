@@ -65,6 +65,12 @@ plan to move worker features into .NET one at a time.
 with YARP in `Backend/src/API/Gateway/WorkerGateway.cs`). Any route the API implements itself wins over the forwarder, so
 moving a feature from the worker to the API needs no change in the web app.
 
+**How the programs are started.** An install starts with `qa-studio.cmd` (a small script that starts the API and the
+worker). Developers can instead run the **Aspire AppHost** (`Backend/src/AppHost`): one command starts every program with hot
+reload and opens a dashboard. Its most useful page is **Traces**, which shows one click followed through the API, the gateway
+and the worker as a single timeline (**distributed tracing** with OpenTelemetry). See
+[ADR 0012](adr/0012-aspire-for-development-and-observability.md).
+
 ---
 
 ## 3. One request, end to end

@@ -95,6 +95,7 @@ QA Studio is **three programs** that work together:
 | Database   | Microsoft SQL Server (EF Core migrations)                                                          |
 | AI / Voice | Anthropic and Gemini providers, MCP server (`qa-mcp`), LiveKit voice agent (`qa-voice`)            |
 | Quality    | ESLint, Prettier, SonarAnalyzer.CSharp (warnings fail the build), Azure Pipelines CI               |
+| Dev tools  | Aspire AppHost (one command, hot reload, dashboard), OpenTelemetry traces across API and worker    |
 
 ---
 
@@ -107,7 +108,9 @@ QA_STUDIO/
 │   │   ├── Core/              Domain: entities, rules, errors. Depends on nothing.
 │   │   ├── Application/       Use cases: Features/<Feature>/<UseCase> (command/query + handler + response)
 │   │   ├── Infrastructure/    EF Core, migrations, Dapper reads, repositories, cache, worker client
-│   │   └── API/               HTTP endpoints, security, error shape, Swagger, gateway to the worker
+│   │   ├── API/               HTTP endpoints, security, error shape, Swagger, gateway to the worker
+│   │   ├── ServiceDefaults/   OpenTelemetry for the API (on only when an OTLP endpoint is configured)
+│   │   └── AppHost/           Aspire: runs everything for development with hot reload and a dashboard
 │   ├── tests/
 │   │   ├── QaStudio.UnitTests/
 │   │   └── QaStudio.IntegrationTests/   Run against a throw-away SQL Server database
@@ -256,6 +259,35 @@ npm run dev
 
 Open **http://localhost:5173**. Vite forwards `/api` to the API on port 5080.
 
+### Option D: everything with hot reload and a dashboard (Aspire, for developers)
+
+One command starts the API, the worker, the Vite dev server (and, if switched on, the voice agent), each with hot reload:
+
+```bash
+dotnet run --project Backend/src/AppHost
+```
+
+Or open `Backend/QaStudio.sln` in Visual Studio, set **QaStudio.AppHost** as the startup project and press F5.
+
+| Part         | Hot reload                                                                                         |
+| ------------ | -------------------------------------------------------------------------------------------------- |
+| .NET API     | `dotnet watch` (from Visual Studio: its own hot reload and debugger)                               |
+| Worker       | `tsc --watch` recompiles, `node --watch` restarts it (a restart cancels runs in progress)          |
+| Voice agent  | Same as the worker. Off by default: set `QaStudio:Voice` to `true` (needs LiveKit in `Worker/.env`) |
+| Frontend     | Vite hot module replacement                                                                        |
+
+The **Aspire dashboard** opens at **http://localhost:15080**. It shows each process's state, console logs and health, plus
+**traces**: one request followed from the API through the gateway to the worker and back. Open the app at
+**http://localhost:5173**, as in option C.
+
+- Install dependencies first (`npm ci` in `Backend/Worker` and `Frontend`). The AppHost never runs `npm install`.
+- It uses the same database as the API (`Backend/appsettings.json`). To use a scratch database, give the AppHost
+  `ConnectionStrings__QaStudio`. For a throw-away SQL Server container (needs Docker), set `QaStudio__SqlContainer=true`.
+- Settings are in `Backend/src/AppHost/appsettings.json`: ports, `HotReload`, `Frontend`, `Voice` and `SqlContainer`.
+- Stop the API in Visual Studio first: both listen on port 5080, and `dotnet watch` builds into the folder VS locks.
+- This is for development only. Testers still start QA Studio with option A or B. Why:
+  [ADR 0012](docs/adr/0012-aspire-for-development-and-observability.md).
+
 ### After the app starts
 
 1. Open **Projects** (the start page) and create a project.
@@ -325,6 +357,9 @@ Runs are only allowed against environments listed in `QA_ALLOWED_ENVS`; anything
   ([ADR 0003](docs/adr/0003-atomic-design-feature-folders.md)).
 - **Consistent errors:** every layer returns the same JSON error shape.
 - **Quality bar:** warnings as errors with SonarAnalyzer, accessibility tests with axe-core, TSDoc on every export.
+- **Observability in development:** an Aspire AppHost runs every process with hot reload; OpenTelemetry in the API and the
+  worker joins them into one trace in the Aspire dashboard. Off in installs
+  ([ADR 0012](docs/adr/0012-aspire-for-development-and-observability.md)).
 
 Every decision and its trade-offs are recorded in [`docs/adr/`](docs/adr/).
 
@@ -370,6 +405,8 @@ Every decision and its trade-offs are recorded in [`docs/adr/`](docs/adr/).
 | Build fails on a warning                    | Intended: warnings are errors. Fix the warning shown (often a Sonar rule).                                   |
 | Frontend type errors about shared types     | Run `npm install` in `Backend/Worker` too; the frontend reads types from `Backend/Worker/packages/shared`.    |
 | Build fails with "file is locked" (Windows) | Visual Studio is holding `bin/`. Stop debugging, or build with `--artifacts-path` pointing to another folder. |
+| AppHost: API fails to build or bind 5080    | The API is also running from Visual Studio. Stop it, or start the AppHost from Visual Studio (F5) instead.    |
+| AppHost: no traces in the dashboard         | Wait a few seconds (spans are sent in batches) and refresh. `/api/health` and `/api/events` are not traced.  |
 
 ---
 

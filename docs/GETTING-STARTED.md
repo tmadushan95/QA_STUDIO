@@ -23,6 +23,14 @@ and add its users in **Sign-in users**. Browser and speed are in **Organization 
 
 If you see that port 4000 or 5080 is already in use, QA Studio is probably already running: open http://127.0.0.1:5080, or stop the other copy.
 
+**Developing?** Use one command for everything, with hot reload in the API, worker, voice agent and web app, and the Aspire
+dashboard (logs, health, traces across the API and the worker) at http://localhost:15080:
+
+    dotnet run --project Backend/src/AppHost    # or F5 on QaStudio.AppHost in Visual Studio; open http://localhost:5173
+
+It needs the same first-time setup, and the API must not also be running from Visual Studio. Details and settings:
+[Backend/README.md](../Backend/README.md#run-everything-for-development-aspire). Testers keep using `qa-studio.cmd`.
+
 Checks: `npm run check` in `Backend/Worker` and in `Frontend`; `dotnet test` in `Backend`.
 
 ## Layout

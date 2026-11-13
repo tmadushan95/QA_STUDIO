@@ -28,6 +28,17 @@ Browser ──► QaStudio.Api (.NET 10, 127.0.0.1:5080) ──► SQL Server
 Requires the .NET 10 SDK, the EF Core tools, Node.js 22.13+ and SQL Server. First-time setup and every setting:
 [Backend/README.md](../Backend/README.md). Then `Backend\qa-studio.cmd`, or `npm start` in `Backend/Worker`.
 
+For development, `dotnet run --project Backend/src/AppHost` (or F5 on **QaStudio.AppHost**) starts the API, the worker, the
+Vite dev server and optionally the voice agent, each with hot reload, plus the Aspire dashboard
+([Backend/README.md](../Backend/README.md#run-everything-for-development-aspire)).
+
+**Tracing.** In the dashboard one trace follows a request across both runtimes: the API's ASP.NET Core and HttpClient spans
+(which include the YARP gateway's forwarding), the worker's span for the same request (it continues the `traceparent`
+header), and the worker's own `fetch` calls back to the API, such as the write-behind flush. The API side is
+`src/ServiceDefaults`; the worker side is `Worker/services/qa-api/src/telemetry.ts`. Both are off unless
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set, so an install does no telemetry work. Why and what was left out:
+[adr/0012](adr/0012-aspire-for-development-and-observability.md).
+
 ## 3. The .NET API
 
 ### Layers

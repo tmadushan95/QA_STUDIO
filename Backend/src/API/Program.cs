@@ -4,6 +4,7 @@ using QaStudio.Api.Security;
 using QaStudio.Application;
 using QaStudio.Application.Common;
 using QaStudio.Infrastructure;
+using QaStudio.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,9 @@ builder.Configuration
     .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: false, reloadOnChange: false)
     .AddJsonFile(Path.Combine(AppContext.BaseDirectory, $"appsettings.{builder.Environment.EnvironmentName}.json"), optional: true, reloadOnChange: false)
     .AddEnvironmentVariables();
+
+// OpenTelemetry, only when the Aspire AppHost (or an operator) configures an OTLP endpoint; otherwise a no-op.
+builder.AddServiceDefaults();
 
 builder.Services
     .AddApplication()

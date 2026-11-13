@@ -1,0 +1,21 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
+  <!--
+    Development orchestrator: starts the API, the Node worker (and optionally the voice agent and a SQL Server container)
+    with one command and shows logs, traces and metrics in the Aspire dashboard. Not part of a QA Studio install, which still
+    starts with qa-studio.cmd / Worker/scripts/start.mjs. See docs/adr/0012-aspire-for-development-and-observability.md.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>QaStudio.AppHost</RootNamespace>
+    <UserSecretsId>qa-studio-apphost</UserSecretsId>
+    <!-- ASPIRE010: the orchestrator and dashboard come from NuGet packages, so the separate Aspire CLI is not required. -->
+    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.JavaScript" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\API\QaStudio.Api.csproj" />
+  </ItemGroup>
+</Project>

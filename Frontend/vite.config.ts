@@ -33,7 +33,8 @@ export default defineConfig({
   plugins: [react()],
   customLogger: logger,
   server: {
-    port: 5173,
+    // PORT lets the Aspire AppHost choose it (Backend/src/AppHost); 5173 otherwise.
+    port: Number(process.env['PORT'] ?? 5173),
     proxy: {
       '/api': {
         target: api,

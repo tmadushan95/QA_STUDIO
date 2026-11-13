@@ -39,6 +39,7 @@ import { isLoopbackHost } from './security.js';
 import { loadSecretKey, SecretBox } from './secrets.js';
 import { SettingsService } from './settings-service.js';
 import { MemoryStore } from './store.js';
+import { startTelemetry } from './telemetry.js';
 
 const port = Number(process.env['PORT'] ?? 4000);
 // Loopback by default. Listening on anything else is refused unless an access token protects the API.
@@ -50,6 +51,10 @@ try {
 } catch {
   // No .env file: rely on the process environment.
 }
+
+// Before anything calls fetch, so the first calls to the API are traced too. Undefined (and nothing loaded) unless the
+// Aspire AppHost or an operator sets OTEL_EXPORTER_OTLP_ENDPOINT.
+const telemetry = await startTelemetry();
 
 const fail = (message: string): never => {
   process.stderr.write(`qa-api cannot start: ${message}\n`);
@@ -415,6 +420,7 @@ const app = createApp(
     secureCookie: process.env['QA_SECURE_COOKIE'] === 'true',
   },
 );
+telemetry?.instrument(app);
 registerInternalSync(app, { token: internalToken, store, events, config: storage });
 
 // The API asks for AI suggestions when it fills parameter values. Only when a provider is set up; otherwise it guesses.
