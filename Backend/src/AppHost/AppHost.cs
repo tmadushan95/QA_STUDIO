@@ -108,6 +108,10 @@ IResourceBuilder<IResource> ConfigureApi<T>(IResourceBuilder<T> resource)
         .WithEnvironment("Urls", apiUrl)
         .WithEnvironment("Worker__BaseUrl", workerUrl)
         .WithEnvironment("Worker__InternalToken", internalToken)
+        // Visual Studio injects its Endpoints Explorer helper (a hosting startup assembly) into the API it debugs. Launched
+        // through the AppHost, VS cannot supply the file, so every start logged a Critical "Hosting startup assembly exception".
+        // Exclude just that one; other hosting startups (such as dotnet watch's) still load.
+        .WithEnvironment("ASPNETCORE_HOSTINGSTARTUPEXCLUDEASSEMBLIES", "Microsoft.WebTools.ApiEndpointDiscovery")
         .WithHttpHealthCheck("/api/health");
 
     // Database, in order of preference:
