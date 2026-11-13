@@ -67,7 +67,9 @@
   color: var(--color-nav-active);
   font-size: var(--text-md);
   font-weight: var(--weight-bold);
-  letter-spacing: -0.01em;
+  /* Shown in capitals; the text stays "QA Studio" for screen readers and copy. Capitals need a little air. */
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 .tagline {
   color: var(--color-nav-muted);
