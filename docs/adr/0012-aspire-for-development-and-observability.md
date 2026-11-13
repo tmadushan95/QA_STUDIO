@@ -45,6 +45,9 @@ Rules that keep this safe:
 4. **Same addresses as today.** Ports are fixed (5080, 4000, 5173 by default, configurable) and bound to `127.0.0.1`, so the
    API's host and origin checks, the worker's loopback rule and the Vite proxy work unchanged.
 5. **No `npm install` on start.** It could rewrite a lockfile; dependencies are still installed with `npm ci`.
+6. **Normal certificate trust.** Aspire 13 points `SSL_CERT_DIR` at its development certificate by default. Native
+   libraries honour it and then trust no public CA (LiveKit's Rust client failed to join rooms), so the Node processes use
+   `CertificateTrustScope.None`. Nothing in QA Studio serves HTTPS locally, so the development certificate is not needed.
 
 ## Rejected
 

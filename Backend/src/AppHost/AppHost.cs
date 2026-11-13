@@ -85,7 +85,7 @@ if (options.GetValue("Voice", false))
 // The Vite dev server: hot module replacement in the browser, and /api proxied to the API exactly as when started by hand.
 if (options.GetValue("Frontend", true))
 {
-    builder.AddJavaScriptApp("frontend", frontendDirectory, "dev")
+    WithPublicCertificateTrust(builder.AddJavaScriptApp("frontend", frontendDirectory, "dev"))
         // Never run "npm install" on start: it could rewrite package-lock.json. Dependencies are installed with npm ci.
         .WithNpm(install: false)
         .WithHttpEndpoint(port: frontendPort, env: "PORT", isProxied: false)
@@ -137,8 +137,16 @@ IResourceBuilder<IResource> ConfigureApi<T>(IResourceBuilder<T> resource)
 
 // Every Node process waits for the first compile, so it never starts on missing or stale JavaScript.
 IResourceBuilder<T> ConfigureNode<T>(IResourceBuilder<T> resource)
-    where T : IResourceWithWaitSupport =>
-    resource.WaitForCompletion(workerBuild);
+    where T : IResourceWithWaitSupport, IResourceWithEnvironment, IResourceWithArgs =>
+    WithPublicCertificateTrust(resource).WaitForCompletion(workerBuild);
+
+// Aspire points SSL_CERT_DIR at a folder holding only its development certificate. Node's own TLS ignores that, but
+// native libraries do not: LiveKit's Rust client (which a voice job uses to join the room) then trusted no public CA,
+// failed with "no native root CA certificates found", and the voice assistant never joined. Nothing here serves HTTPS,
+// so these processes keep the machine's normal certificate trust.
+static IResourceBuilder<T> WithPublicCertificateTrust<T>(IResourceBuilder<T> resource)
+    where T : IResourceWithEnvironment, IResourceWithArgs =>
+    resource.WithCertificateTrustScope(CertificateTrustScope.None);
 
 // "node --watch" restarts the process when any module it loaded changes (the tsc output of every worker package).
 static string[] NodeArgs(string script, params string[] scriptArgs) =>

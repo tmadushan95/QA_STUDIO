@@ -9,7 +9,11 @@
   (http://localhost:15080) shows each one's state, console logs and health
   ([adr/0012](adr/0012-aspire-for-development-and-observability.md)).
 - **Hot reload everywhere:** `dotnet watch` for the API (an IDE uses its own), `tsc --watch` + `node --watch` for the worker and
-  voice agent, Vite HMR for the web app.
+  voice agent, Vite HMR for the web app. The voice agent stops `node --watch`'s file reporting from reaching the job
+  processes LiveKit forks, which otherwise closed it at start ("The voice assistant did not join").
+- **Normal certificate trust for the Node processes under the AppHost.** Aspire's default points `SSL_CERT_DIR` at its
+  development certificate only; LiveKit's native client then trusted no public CA, so the voice agent registered but could
+  not join the room. The worker, voice agent and Vite now keep the machine's trust (`CertificateTrustScope.None`).
 - **Distributed tracing:** OpenTelemetry in the API (`Backend/src/ServiceDefaults`) and the worker
   (`services/qa-api/src/telemetry.ts`) joins one request into one trace across the API, the gateway and the worker. It is on only
   when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so installs are unchanged.
