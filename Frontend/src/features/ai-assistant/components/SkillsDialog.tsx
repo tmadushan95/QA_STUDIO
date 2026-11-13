@@ -23,6 +23,9 @@ import styles from './SkillsDialog.module.css';
 /** Same rule as the server: lowercase letters, digits and -, starting with a letter. */
 const NAME = /^[a-z][a-z0-9-]{0,63}$/;
 const MAX_INSTRUCTIONS = 8000;
+/** Same minimums as the server (`SkillSchema`), counted after trimming. */
+const MIN_DESCRIPTION = 3;
+const MIN_INSTRUCTIONS = 10;
 
 /** Props of `SkillsDialog`. */
 export interface SkillsDialogProps {
@@ -87,10 +90,19 @@ export function SkillsDialog({ skills, onClose, onChanged }: SkillsDialogProps) 
       : fields['name'];
   // Saving a new skill under a taken name replaces it, so say so before it happens.
   const replaces = isNew && skills.some((s) => s.name === value.name);
+  // A started but too short field says why Save stays off; an empty one is covered by its required mark.
+  const descriptionError =
+    value.description && value.description.trim().length < MIN_DESCRIPTION
+      ? `Say in a line what the skill is for: at least ${MIN_DESCRIPTION} characters.`
+      : fields['description'];
+  const instructionsError =
+    value.instructions && value.instructions.trim().length < MIN_INSTRUCTIONS
+      ? `Write at least ${MIN_INSTRUCTIONS} characters of instructions for the AI to follow.`
+      : fields['instructions'];
   const valid =
     NAME.test(value.name) &&
-    value.description.trim().length >= 3 &&
-    value.instructions.trim().length >= 10;
+    value.description.trim().length >= MIN_DESCRIPTION &&
+    value.instructions.trim().length >= MIN_INSTRUCTIONS;
 
   const save = async () => {
     setBusy(true);
@@ -241,8 +253,8 @@ export function SkillsDialog({ skills, onClose, onChanged }: SkillsDialogProps) 
               <Field
                 label="Description"
                 required
-                hint="One line on what it is for, shown next to its name."
-                error={fields['description']}
+                hint={`One line on what it is for, shown next to its name. At least ${MIN_DESCRIPTION} characters.`}
+                error={descriptionError}
               >
                 {(p) => (
                   <TextInput
@@ -257,8 +269,8 @@ export function SkillsDialog({ skills, onClose, onChanged }: SkillsDialogProps) 
               <Field
                 label="Instructions"
                 required
-                hint={`What the AI must follow when the skill is used: scope, naming, priorities, wording. It cannot change the safety rules. ${value.instructions.length} / ${MAX_INSTRUCTIONS}`}
-                error={fields['instructions']}
+                hint={`What the AI must follow when the skill is used: scope, naming, priorities, wording. It cannot change the safety rules. At least ${MIN_INSTRUCTIONS} characters. ${value.instructions.length} / ${MAX_INSTRUCTIONS}`}
+                error={instructionsError}
               >
                 {(p) => (
                   <TextArea

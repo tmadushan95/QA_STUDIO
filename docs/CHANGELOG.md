@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Skills dialog says why Save skill is off — 2026-11-13
+
+- **AI Assistant › Skills:** the Description and Instructions hints now give their minimums (3 and 10 characters, the server's
+  rules). A field that is started but too short shows a message under it. Before, Save skill stayed off with no reason, for
+  example with 9 characters of instructions.
+
 ### Aspire for development, with hot reload and tracing — 2026-11-13
 
 - **One command for developers:** `dotnet run --project Backend/src/AppHost` (or F5 on **QaStudio.AppHost**) starts the API, the
