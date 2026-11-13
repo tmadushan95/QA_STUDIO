@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>QaStudio.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Application\QaStudio.Application.csproj" />
+    <ProjectReference Include="..\Infrastructure\QaStudio.Infrastructure.csproj" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Yarp.ReverseProxy" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Settings live at Backend/ (agreed layout); they are copied next to the binaries so every launch finds them. -->
+    <Content Include="..\..\appsettings*.json" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

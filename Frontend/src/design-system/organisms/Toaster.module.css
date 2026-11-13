@@ -1,0 +1,57 @@
+/* Toaster organism: bottom-right on desktop, full width above the bottom bar on phones. */
+.region {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: min(26rem, calc(100vw - 2rem));
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-nav);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-lg);
+  border-left: 4px solid var(--color-success);
+  animation: in 160ms ease;
+}
+.toast button[aria-label='Dismiss'] {
+  color: var(--color-nav-text);
+}
+.danger {
+  border-left-color: var(--color-danger);
+}
+.info {
+  border-left-color: var(--color-primary);
+}
+.message {
+  flex: 1;
+}
+.action {
+  border: 0;
+  background: none;
+  color: #a5b4fc;
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+}
+@keyframes in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (max-width: 47.5rem) {
+  .region {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: 5rem;
+    max-width: none;
+  }
+}

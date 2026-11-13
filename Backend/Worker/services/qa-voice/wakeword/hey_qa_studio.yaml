@@ -1,0 +1,17 @@
+# Training config for the "Hey QA Studio" wake phrase, for livekit-wakeword (https://github.com/livekit/livekit-wakeword).
+# Samples are synthesised with text-to-speech, so no recordings are needed. Check the keys against the version you
+# install, then:
+#   pip install "livekit-wakeword[train,eval,export]"
+#   livekit-wakeword setup --config hey_qa_studio.yaml
+#   livekit-wakeword run hey_qa_studio.yaml
+# Copy the exported hey_qa_studio.onnx to Frontend/public/models/, with melspectrogram.onnx and embedding_model.onnx.
+model_name: hey_qa_studio
+target_phrases:
+  - hey QA studio
+n_samples: 20000
+model:
+  model_type: dnn
+  model_size: small
+steps: 50000
+# A longer phrase than "hey QA" on purpose: short phrases trigger far more often by accident.
+target_fp_per_hour: 0.2

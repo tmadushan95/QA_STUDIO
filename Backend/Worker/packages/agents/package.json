@@ -1,0 +1,14 @@
+{
+  "name": "@qa-studio/agents",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@qa-studio/knowledge": "0.1.0",
+    "@qa-studio/llm": "0.1.0",
+    "@qa-studio/shared": "0.1.0",
+    "zod": "4.6.7"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_29",
+  "description": "DELETES a Draft project; the Draft list no longer shows it and still shows another project",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.deleteTc29}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.confirm-delete",
+      "params": {
+        "lrp": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "draft",
+        "code": "{{data.deleteTc29}}",
+        "listed": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "draft",
+        "code": "{{data.draftProject}}",
+        "listed": true
+      }
+    }
+  ]
+}

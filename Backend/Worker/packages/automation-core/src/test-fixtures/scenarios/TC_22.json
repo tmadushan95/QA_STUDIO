@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_22",
+  "description": "DELETES a Draft project; it is in no list afterwards",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.deleteTc22}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.confirm-delete",
+      "params": {
+        "lrp": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "draft",
+        "code": "{{data.deleteTc22}}",
+        "listed": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "open",
+        "code": "{{data.deleteTc22}}",
+        "listed": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "mine",
+        "code": "{{data.deleteTc22}}",
+        "listed": false
+      }
+    }
+  ]
+}

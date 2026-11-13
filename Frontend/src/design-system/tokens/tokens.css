@@ -1,0 +1,112 @@
+/*
+ * Design tokens: the one place colours, type, spacing, radius and shadows are defined.
+ * Components use these variables only, so a brand change is an edit to this file.
+ * One light theme by design; every text/background pair here meets WCAG AA contrast (4.5:1 or better).
+ *
+ * Palette "Indigo night": a deep navy shell with an indigo primary, so the product reads as one calm workspace and
+ * status colours (green, red, amber, blue) stand out against it.
+ */
+:root {
+  /* Surfaces */
+  --color-page: #f4f6fb;
+  --color-surface: #ffffff;
+  --color-subtle: #f1f4fa;
+  --color-hover: #ebf0fa;
+  --color-border: #e2e8f2;
+  --color-border-strong: #cbd5e1;
+
+  /* Text */
+  --color-text: #0b1324;
+  --color-text-secondary: #44516a;
+  --color-text-muted: #5f6b82;
+  --color-text-inverse: #ffffff;
+
+  /* Primary (actions, links, focus) */
+  --color-primary: #3b4fe4;
+  --color-primary-hover: #2f3fcb;
+  --color-primary-soft: #eef1ff;
+  --color-primary-border: #c9d1ff;
+
+  /* Accent: AI features, so they are recognisable at a glance */
+  --color-accent: #6d28d9;
+  --color-accent-soft: #f3edff;
+
+  /* Status: strong colour for icons and text, soft colour for backgrounds */
+  --color-success: #0f7b47;
+  --color-success-soft: #e8f7ef;
+  --color-danger: #d92d20;
+  --color-danger-hover: #b42318;
+  --color-danger-soft: #fef3f2;
+  --color-warning: #b54708;
+  --color-warning-soft: #fffaeb;
+  --color-info: #0b6bcb;
+  --color-info-soft: #eff8ff;
+
+  /* Charts: categorical series, distinguishable for common colour-vision deficiencies */
+  --chart-1: #3b4fe4;
+  --chart-2: #0f9d76;
+  --chart-3: #e8590c;
+  --chart-4: #8b5cf6;
+  --chart-5: #0891b2;
+  --chart-6: #d6336c;
+  --chart-grid: #e2e8f2;
+
+  /* Shell (sidebar and brand) */
+  --color-nav: #0e1630;
+  --color-nav-2: #141f45;
+  --color-nav-text: #b8c2dc;
+  --color-nav-muted: #7d89a8;
+  --color-nav-active: #ffffff;
+  --color-nav-active-bg: rgb(124 140 255 / 0.18);
+  --color-nav-indicator: #8c9bff;
+  --gradient-brand: linear-gradient(135deg, #5b6cff 0%, #8b5cf6 100%);
+  --gradient-hero: linear-gradient(135deg, #eef1ff 0%, #f3edff 60%, #ffffff 100%);
+
+  /* Type */
+  --font-sans: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Spacing (4 px grid) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgb(11 19 36 / 0.06);
+  --shadow-md: 0 4px 14px rgb(11 19 36 / 0.08);
+  --shadow-lg: 0 18px 44px rgb(11 19 36 / 0.2);
+  --shadow-card: 0 1px 2px rgb(11 19 36 / 0.04), 0 2px 8px rgb(11 19 36 / 0.04);
+  --focus-ring: 0 0 0 3px rgb(59 79 228 / 0.35);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --duration: 160ms;
+
+  /* Layout */
+  --sidebar-width: 16.5rem;
+  --sidebar-rail: 4.75rem;
+  --topbar-height: 4rem;
+  --bottombar-height: 4rem;
+  --content-max: 92rem;
+  --control-height: 2.375rem;
+}

@@ -1,0 +1,49 @@
+/* Menu molecule. */
+.wrap {
+  position: relative;
+  display: inline-block;
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-1));
+  z-index: 30;
+  min-width: 12rem;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+/* Set by Menu when there is no room below, such as on the last rows of a scrolling table. */
+.menu[data-placement='up'] {
+  top: auto;
+  bottom: calc(100% + var(--space-1));
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.item:hover:not(:disabled),
+.item:focus-visible {
+  background: var(--color-hover);
+  box-shadow: none;
+}
+.item:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+.danger {
+  color: var(--color-danger);
+}

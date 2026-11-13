@@ -1,0 +1,3 @@
+# The unused-using check needs a documentation file, which test projects do not produce.
+[*.cs]
+dotnet_diagnostic.IDE0005.severity = none

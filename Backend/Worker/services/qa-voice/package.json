@@ -1,0 +1,18 @@
+{
+  "name": "@qa-studio/qa-voice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "description": "QA Studio voice agent: turns speech into commands that the web app carries out, over LiveKit.",
+  "scripts": {
+    "start": "node dist/server.js start",
+    "dev": "node dist/server.js dev"
+  },
+  "dependencies": {
+    "@livekit/agents": "1.9.5",
+    "@livekit/rtc-node": "1.2.1",
+    "@qa-studio/shared": "0.1.0",
+    "zod": "4.6.7"
+  }
+}

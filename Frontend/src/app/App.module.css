@@ -1,0 +1,63 @@
+/* App shell: top-bar status and the access-token screen. */
+.muted {
+  color: var(--color-text-muted);
+}
+.setup {
+  text-decoration: none;
+}
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.dotOn,
+.dotOff {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+.dotOn {
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-soft);
+}
+.dotOff {
+  background: var(--color-text-muted);
+}
+/* On phones the dot alone says it; the word is still read out. */
+@media (max-width: 40rem) {
+  .status {
+    display: none;
+  }
+  .liveText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+.gate {
+  min-height: 100vh;
+  background: var(--gradient-hero);
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+}
+.gateCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+.banner {
+  margin-bottom: var(--space-5);
+}

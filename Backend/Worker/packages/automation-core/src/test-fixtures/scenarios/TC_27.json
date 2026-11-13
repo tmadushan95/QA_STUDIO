@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_27",
+  "description": "Delete is available on a Draft LRP project (user with the permission)",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "lrp",
+        "code": "{{data.lrpDraft}}"
+      }
+    },
+    {
+      "action": "project.assert-delete-button",
+      "params": {
+        "visible": true
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.assert-delete-dialog",
+      "params": {
+        "kind": "lrp"
+      }
+    },
+    {
+      "action": "project.cancel-delete",
+      "params": {}
+    }
+  ]
+}

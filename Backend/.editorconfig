@@ -1,0 +1,16 @@
+root = false
+
+# EF Core writes these; they are regenerated, never edited, so analyzers have nothing to say to anyone.
+[**/Migrations/*.cs]
+generated_code = true
+
+# SonarAnalyzer leaves rules that take a threshold switched off unless asked. These are in SonarQube's "Sonar way".
+[*.cs]
+dotnet_diagnostic.S107.severity = warning
+dotnet_diagnostic.S110.severity = warning
+dotnet_diagnostic.S1479.severity = warning
+dotnet_diagnostic.S2436.severity = warning
+dotnet_diagnostic.S3776.severity = warning
+
+# An unused using is an error here too, which SonarQube reports as S1128.
+dotnet_diagnostic.IDE0005.severity = warning

@@ -1,0 +1,105 @@
+/* Sign-in Users page. */
+.page {
+  display: grid;
+  gap: var(--space-5);
+}
+/* Grid children may shrink below their content (a tab strip, a wide table), so the page never scrolls sideways. */
+.page > * {
+  min-width: 0;
+}
+.muted {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 2fr);
+  gap: var(--space-3);
+}
+.fact,
+.tip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+.factIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.factValue {
+  display: block;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+}
+.tip {
+  background: var(--gradient-hero);
+  border-color: var(--color-primary-border);
+  color: var(--color-text-secondary);
+}
+.tip svg {
+  flex: none;
+  color: var(--color-primary);
+}
+.project {
+  display: grid;
+  gap: var(--space-3);
+}
+.projectHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.projectName {
+  font-size: var(--text-lg);
+}
+.projectActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bulk {
+  display: grid;
+  gap: var(--space-3);
+}
+.bulkRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-subtle);
+}
+@media (max-width: 64rem) {
+  .facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .tip {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 40rem) {
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bulkRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

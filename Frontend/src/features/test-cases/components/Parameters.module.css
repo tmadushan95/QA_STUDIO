@@ -1,0 +1,136 @@
+/* ParametersPanel, ParametersDialog and the project's common parameters. */
+.panel {
+  display: grid;
+  gap: var(--space-4);
+}
+.head,
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.muted,
+.loading {
+  color: var(--color-text-muted);
+}
+.head .muted {
+  flex: 1;
+  min-width: 16rem;
+}
+.loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.grid {
+  display: grid;
+  gap: var(--space-3);
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-subtle);
+}
+.rowMissing {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+/* Two-option segmented control: which layer the value comes from. */
+.segment {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.seg,
+.segOn {
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.segOn {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+.inherited {
+  margin: 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.counts {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+@media (max-width: 47.5rem) {
+  .row,
+  .control {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* The panel when the values cannot be loaded. */
+.unavailable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.command {
+  display: block;
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.namesHead {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.names li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-subtle);
+  color: var(--color-text-secondary);
+}

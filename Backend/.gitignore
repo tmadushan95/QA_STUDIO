@@ -1,0 +1,11 @@
+bin/
+obj/
+appsettings.Development.json
+Worker/node_modules/
+Worker/**/node_modules/
+Worker/**/dist/
+Worker/**/*.tsbuildinfo
+Worker/.env
+Worker/data/
+Worker/artifacts/
+Worker/reports/

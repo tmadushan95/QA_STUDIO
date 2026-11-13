@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_15",
+  "description": "DELETES one child; each remaining child keeps its details",
+  "steps": [
+    {
+      "action": "clubbed.remember-children",
+      "params": {
+        "code": "{{data.clubbedParentTc15}}"
+      }
+    },
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.draftChildTc15}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.assert-delete-dialog",
+      "params": {
+        "kind": "linked",
+        "clubbedCode": "{{data.clubbedParentTc15}}"
+      }
+    },
+    {
+      "action": "project.confirm-delete",
+      "params": {
+        "lrp": false
+      }
+    },
+    {
+      "action": "clubbed.assert-children-unchanged",
+      "params": {
+        "deletedCode": "{{data.draftChildTc15}}"
+      }
+    }
+  ]
+}

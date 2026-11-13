@@ -1,0 +1,110 @@
+# Quality gate for QA Studio (Azure Pipelines).
+# Every change to main and every pull request must pass: formatting, type checks, lint, tests
+# (including real-browser tests and accessibility checks), a full build, and a dependency audit.
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  CI: 'true'
+  PLAYWRIGHT_BROWSERS_PATH: $(Pipeline.Workspace)/ms-playwright
+
+steps:
+  - task: NodeTool@0
+    displayName: Use Node.js 22
+    inputs:
+      versionSpec: '22.x'
+
+  - task: UseDotNet@2
+    displayName: Use .NET 10
+    inputs:
+      packageType: sdk
+      version: '10.x'
+
+  - script: dotnet build Backend/QaStudio.sln --configuration Release
+    displayName: Build backend (warnings are errors)
+
+  - script: dotnet test Backend/tests/QaStudio.UnitTests --configuration Release --no-build
+    displayName: Backend unit tests
+
+  # Backend/tests/QaStudio.IntegrationTests needs a SQL Server: set QASTUDIO_TEST_CONNECTION on an agent that has one, and add it here.
+
+  - script: npm ci
+    workingDirectory: Backend/Worker
+    displayName: Install worker dependencies (lockfile only)
+
+  - script: npm ci
+    workingDirectory: Frontend
+    displayName: Install frontend dependencies (lockfile only)
+
+  - task: Cache@2
+    displayName: Cache Playwright browsers
+    inputs:
+      key: 'playwright | "$(Agent.OS)" | Backend/Worker/package-lock.json'
+      path: $(PLAYWRIGHT_BROWSERS_PATH)
+
+  - script: npx playwright install --with-deps chromium
+    workingDirectory: Backend/Worker
+    displayName: Install Chromium for browser tests
+
+  - script: npm run format
+    workingDirectory: Backend/Worker
+    displayName: Check worker formatting
+
+  - script: npm run format
+    workingDirectory: Frontend
+    displayName: Check frontend formatting
+
+  - script: npm run typecheck
+    workingDirectory: Backend/Worker
+    displayName: Type check worker (strict)
+
+  - script: npm run typecheck
+    workingDirectory: Frontend
+    displayName: Type check frontend (strict)
+
+  - script: npm run lint
+    workingDirectory: Backend/Worker
+    displayName: Lint worker
+
+  - script: npm run lint
+    workingDirectory: Frontend
+    displayName: Lint frontend
+
+  - script: npm run test:ci
+    workingDirectory: Backend/Worker
+    displayName: Worker unit, API and browser tests
+
+  - script: npm test
+    workingDirectory: Frontend
+    displayName: Frontend and accessibility tests
+
+  - task: PublishTestResults@2
+    displayName: Publish test results
+    condition: succeededOrFailed()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: Backend/Worker/reports/junit.xml
+      failTaskOnFailedTests: true
+
+  - script: npm run build
+    workingDirectory: Backend/Worker
+    displayName: Build worker and frontend
+
+  # Production dependencies only; fails the build on high or critical advisories.
+  - script: npm audit --omit=dev --audit-level=high
+    workingDirectory: Backend/Worker
+    displayName: Worker dependency audit
+
+  - script: npm audit --omit=dev --audit-level=high
+    workingDirectory: Frontend
+    displayName: Frontend dependency audit

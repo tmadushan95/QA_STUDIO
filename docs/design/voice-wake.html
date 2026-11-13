@@ -1,0 +1,716 @@
+<title>QA Studio Voice Wake</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one long review page. Live prototype first (app frame + voice states), then Settings › Voice, then state and behaviour reference.
+   Tokens follow QA Studio's design-system/tokens/tokens.css; dark values are derived from its navigation palette. */
+:root {
+  --page: #f4f6fb; --surface: #ffffff; --subtle: #f1f4fa; --hover: #ebf0fa;
+  --border: #e2e8f2; --border-strong: #cbd5e1;
+  --text: #0b1324; --text-2: #44516a; --muted: #5f6b82; --inverse: #ffffff;
+  --primary: #3b4fe4; --primary-hover: #2f3fcb; --primary-soft: #eef1ff; --primary-border: #c9d1ff;
+  --accent: #6d28d9; --accent-soft: #f3edff;
+  --success: #0f7b47; --success-soft: #e8f7ef; --danger: #d92d20; --danger-soft: #fef3f2;
+  --warning: #b54708; --warning-soft: #fffaeb;
+  --nav: #0e1630; --nav-2: #141f45; --nav-text: #b8c2dc; --nav-muted: #7d89a8; --nav-active-bg: rgb(124 140 255 / 0.18);
+  --orb-a: #5b6cff; --orb-b: #8b5cf6;
+  --glass: rgb(255 255 255 / 0.86);
+  --shadow-card: 0 1px 2px rgb(11 19 36 / 0.04), 0 2px 8px rgb(11 19 36 / 0.04);
+  --shadow-lg: 0 18px 44px rgb(11 19 36 / 0.16);
+  --font-sans: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px; --r-xl: 16px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #0a1022; --surface: #111a33; --subtle: #16203d; --hover: #1b2748;
+  --border: #233055; --border-strong: #2f3e69;
+  --text: #e8ecf7; --text-2: #b8c2dc; --muted: #8f9ab8; --inverse: #0a1022;
+  --primary: #8c9bff; --primary-hover: #a6b2ff; --primary-soft: #1c2650; --primary-border: #34428a;
+  --accent: #b69cff; --accent-soft: #241b45;
+  --success: #4cc38a; --success-soft: #12301f; --danger: #ff7b6e; --danger-soft: #3a1714;
+  --warning: #f5a65b; --warning-soft: #33220f;
+  --nav: #070c1b; --nav-2: #0d1530; --nav-text: #b8c2dc; --nav-muted: #6f7b9a; --nav-active-bg: rgb(140 155 255 / 0.18);
+  --glass: rgb(17 26 51 / 0.88);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3); --shadow-lg: 0 18px 44px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --page: #0a1022; --surface: #111a33; --subtle: #16203d; --hover: #1b2748;
+  --border: #233055; --border-strong: #2f3e69;
+  --text: #e8ecf7; --text-2: #b8c2dc; --muted: #8f9ab8; --inverse: #0a1022;
+  --primary: #8c9bff; --primary-hover: #a6b2ff; --primary-soft: #1c2650; --primary-border: #34428a;
+  --accent: #b69cff; --accent-soft: #241b45;
+  --success: #4cc38a; --success-soft: #12301f; --danger: #ff7b6e; --danger-soft: #3a1714;
+  --warning: #f5a65b; --warning-soft: #33220f;
+  --nav: #070c1b; --nav-2: #0d1530; --nav-text: #b8c2dc; --nav-muted: #6f7b9a; --nav-active-bg: rgb(140 155 255 / 0.18);
+  --glass: rgb(17 26 51 / 0.88);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3); --shadow-lg: 0 18px 44px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--text); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 56px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 2rem; font-weight: 600; }
+h2 { font-size: 1.375rem; font-weight: 600; }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+.lede { color: var(--text-2); max-width: 68ch; font-size: 1rem; }
+.eyebrow { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
+.sec-head { display: grid; gap: 6px; margin-bottom: 20px; }
+.sec-head p { color: var(--text-2); max-width: 70ch; }
+kbd { font-family: var(--font-mono); font-size: 0.72rem; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; background: var(--surface); color: var(--text-2); white-space: nowrap; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ---------- walkthrough controls ---------- */
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; border-radius: var(--r-md); border: 1px solid var(--border-strong); background: var(--surface); padding: 8px 14px; font-weight: 500; }
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--inverse); }
+.btn.primary:hover { background: var(--primary-hover); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--text-2); }
+.btn svg { width: 16px; height: 16px; }
+.stepper { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 16px; scrollbar-width: thin; }
+.step { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 6px 12px 6px 6px; font-size: 0.8rem; color: var(--text-2); }
+.step b { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--subtle); font-size: 0.72rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.step[aria-current="step"] { border-color: var(--primary-border); background: var(--primary-soft); color: var(--text); }
+.step[aria-current="step"] b { background: var(--primary); color: var(--inverse); }
+.step.err b { background: var(--danger-soft); color: var(--danger); }
+
+/* ---------- app frame ---------- */
+.frame { border: 1px solid var(--border); border-radius: var(--r-xl); overflow: hidden; background: var(--page); box-shadow: var(--shadow-lg); display: grid; grid-template-columns: 208px minmax(0, 1fr); min-height: 640px; }
+.side { background: linear-gradient(180deg, var(--nav), var(--nav-2)); color: var(--nav-text); padding: 18px 12px; display: grid; align-content: start; gap: 4px; }
+.brand { display: flex; align-items: center; gap: 10px; color: #fff; font-family: var(--font-display); font-weight: 600; padding: 4px 8px 18px; }
+.brand i { width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(135deg, var(--orb-a), var(--orb-b)); }
+.nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-md); font-size: 0.85rem; }
+.nav svg { width: 16px; height: 16px; opacity: 0.8; }
+.nav.on { background: var(--nav-active-bg); color: #fff; }
+.nav-label { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nav-muted); padding: 14px 10px 4px; }
+.main { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; position: relative; }
+.top { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; }
+.crumbs { color: var(--muted); font-size: 0.85rem; flex: 1 1 auto; min-width: 0; }
+.crumbs b { color: var(--text); font-weight: 600; }
+
+/* voice pill: the always-visible wake indicator */
+.pill { position: relative; display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); font-size: 0.82rem; color: var(--text-2); transition: border-color .2s, background .2s, box-shadow .2s; white-space: nowrap; }
+.pill .ico { width: 16px; height: 16px; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); position: relative; }
+.pill .dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--success); opacity: 0; animation: breathe 2.6s ease-out infinite; }
+.pill .phrase { color: var(--text); font-weight: 600; }
+.pill.live { border-color: var(--primary-border); background: var(--primary-soft); color: var(--text); box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 12%, transparent); }
+.pill.err { border-color: color-mix(in srgb, var(--danger) 40%, transparent); background: var(--danger-soft); color: var(--danger); }
+.pill .bars { display: inline-flex; gap: 2px; align-items: center; height: 14px; }
+.pill .bars i { width: 3px; border-radius: 2px; background: var(--primary); height: 4px; animation: eq 0.9s ease-in-out infinite; }
+.pill .bars i:nth-child(2) { animation-delay: .15s } .pill .bars i:nth-child(3) { animation-delay: .3s } .pill .bars i:nth-child(4) { animation-delay: .45s }
+.pill .x { display: grid; place-items: center; width: 22px; height: 22px; margin-right: -6px; border-radius: 50%; border: 0; background: transparent; color: var(--muted); }
+.pill .x:hover { background: var(--hover); }
+@keyframes breathe { 0% { transform: scale(.6); opacity: .7 } 100% { transform: scale(1.8); opacity: 0 } }
+@keyframes eq { 0%,100% { height: 4px } 50% { height: 14px } }
+
+/* coach mark: first-run hint anchored to the pill */
+.coach { position: absolute; right: 16px; top: 58px; z-index: 6; width: min(320px, calc(100% - 32px)); background: var(--nav); color: #e8ecf7; border-radius: var(--r-lg); padding: 14px 16px; box-shadow: var(--shadow-lg); display: grid; gap: 8px; font-size: 0.83rem; }
+.coach::before { content: ""; position: absolute; top: -6px; right: 64px; width: 12px; height: 12px; background: var(--nav); transform: rotate(45deg); }
+.coach strong { font-family: var(--font-display); font-size: 0.95rem; color: #fff; }
+.coach p { color: var(--nav-text); }
+.coach .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
+.coach kbd { background: var(--nav-2); color: #e8ecf7; border-color: #34428a; }
+.coach button { border: 0; background: #fff; color: #0e1630; border-radius: var(--r-sm); padding: 5px 12px; font-weight: 600; font-size: 0.8rem; }
+
+/* generator panel */
+.content { padding: 22px 20px 200px; display: grid; gap: 16px; align-content: start; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.field-label { font-size: 0.8rem; font-weight: 600; color: var(--text-2); }
+.textarea { min-height: 84px; border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 10px 12px; background: var(--surface); color: var(--text); position: relative; transition: border-color .2s, box-shadow .2s; }
+.textarea.voice { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+.textarea .ph { color: var(--muted); }
+.textarea .src { position: absolute; right: 8px; bottom: 8px; font-size: 0.7rem; color: var(--primary); display: inline-flex; gap: 4px; align-items: center; font-weight: 600; }
+.opts { display: flex; flex-wrap: wrap; gap: 18px; }
+.opt { display: grid; gap: 6px; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 2px; background: var(--subtle); }
+.seg span { padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; color: var(--text-2); transition: background .25s, color .25s; }
+.seg span.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card); }
+.seg span.flash { background: var(--primary); color: var(--inverse); }
+.list { display: grid; gap: 8px; }
+.case { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface); animation: rise .35s ease both; }
+.case .chk { width: 18px; height: 18px; border-radius: 5px; background: var(--primary); display: grid; place-items: center; color: var(--inverse); margin-top: 2px; }
+.case .t { font-weight: 600; }
+.case .m { color: var(--muted); font-size: 0.8rem; }
+.tag { font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--subtle); color: var(--text-2); white-space: nowrap; }
+.tag.hi { background: var(--danger-soft); color: var(--danger); }
+.tag.md { background: var(--warning-soft); color: var(--warning); }
+.steps { margin-top: 8px; font-size: 0.82rem; color: var(--text-2); }
+.steps summary { cursor: pointer; color: var(--primary); font-weight: 600; font-size: 0.78rem; width: max-content; }
+.steps ol { margin: 6px 0; padding-left: 20px; display: grid; gap: 3px; }
+.steps .pre { margin-top: 4px; overflow-wrap: anywhere; }
+.steps .pre b { color: var(--text); font-weight: 600; margin-right: 4px; }
+.skel { height: 54px; border-radius: var(--r-md); background: linear-gradient(90deg, var(--subtle), var(--hover), var(--subtle)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.empty { color: var(--muted); font-size: 0.85rem; padding: 18px; text-align: center; border: 1px dashed var(--border-strong); border-radius: var(--r-md); }
+.savebar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.savebar .btn.primary.pulse { box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+@keyframes shimmer { to { background-position: -200% 0 } }
+
+/* voice dock: appears only during a live session */
+.dock { position: absolute; left: 20px; right: 20px; bottom: 18px; z-index: 5; background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--primary-border); border-radius: var(--r-xl); box-shadow: var(--shadow-lg); padding: 16px 18px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center; transition: opacity .25s, transform .25s; }
+.dock[hidden] { display: none !important; }
+.orb { width: 64px; height: 64px; border-radius: 50%; position: relative; display: grid; place-items: center; }
+.orb::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8, transparent 45%), conic-gradient(from 0deg, var(--orb-a), var(--orb-b), var(--orb-a)); animation: spin 6s linear infinite; }
+.orb::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--orb-a) 50%, transparent); opacity: 0; }
+.orb[data-mode="listening"]::after { animation: ripple 1.4s ease-out infinite; }
+.orb[data-mode="thinking"]::before { animation-duration: 1.2s; filter: saturate(.8); }
+.orb[data-mode="speaking"]::before { animation: spin 3s linear infinite, talk .5s ease-in-out infinite alternate; }
+.orb[data-mode="connecting"]::before { animation: spin 1s linear infinite; opacity: .75; }
+.orb[data-mode="idle"]::before { animation-duration: 12s; filter: grayscale(.5); opacity: .7; }
+.orb svg { position: relative; width: 22px; height: 22px; color: #fff; }
+.orb .ring { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); transform: rotate(-90deg); }
+.orb .ring circle { fill: none; stroke: var(--primary); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes ripple { 0% { transform: scale(.95); opacity: .8 } 100% { transform: scale(1.35); opacity: 0 } }
+@keyframes talk { from { transform: scale(.94) rotate(0) } to { transform: scale(1.04) rotate(40deg) } }
+.dock-body { display: grid; gap: 6px; min-width: 0; }
+.status { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--primary); }
+.status.warn { color: var(--warning); }
+.say { font-size: 1rem; color: var(--text); min-height: 1.5em; overflow-wrap: anywhere; }
+.say .interim { color: var(--muted); }
+.say .who { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-right: 6px; text-transform: uppercase; letter-spacing: .05em; }
+.hints { display: flex; flex-wrap: wrap; gap: 6px; }
+.hint { font-size: 0.75rem; color: var(--text-2); background: var(--subtle); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 0.75rem; font-weight: 600; color: var(--primary); background: var(--primary-soft); border: 1px solid var(--primary-border); border-radius: 999px; padding: 2px 10px; animation: rise .3s ease both; }
+.dock-actions { display: grid; gap: 6px; justify-items: end; }
+.dock-actions .btn { padding: 6px 12px; font-size: 0.8rem; }
+.dock-actions small { color: var(--muted); font-size: 0.72rem; }
+
+/* toast for wake detection */
+.toast { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); background: var(--nav); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 0.8rem; display: inline-flex; gap: 8px; align-items: center; box-shadow: var(--shadow-lg); z-index: 7; animation: rise .25s ease both; white-space: nowrap; }
+.toast .wave { width: 14px; height: 14px; color: #8c9bff; }
+
+/* ---------- settings mock ---------- */
+.settings { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
+.set-nav { display: grid; gap: 2px; position: sticky; top: env(safe-area-inset-top, 0px); }
+.set-nav span { padding: 8px 12px; border-radius: var(--r-md); color: var(--text-2); font-size: 0.85rem; }
+.set-nav span.on { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-card); min-width: 0; }
+.panel-head { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 16px; align-items: center; flex-wrap: wrap; }
+.panel-head p { color: var(--text-2); font-size: 0.85rem; }
+.status-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--success-soft); color: var(--success); }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge.neutral { background: var(--subtle); color: var(--text-2); }
+.group { padding: 18px 20px; display: grid; gap: 18px; border-bottom: 1px solid var(--border); }
+.group:last-of-type { border-bottom: 0; }
+.group h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-family: var(--font-sans); font-weight: 600; }
+.row2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 24px; align-items: start; }
+.row2 .lbl { display: grid; gap: 2px; }
+.row2 .lbl label, .row2 .lbl b { font-weight: 600; font-size: 0.875rem; }
+.row2 .lbl span { color: var(--muted); font-size: 0.8rem; }
+.switch { position: relative; width: 40px; height: 22px; border-radius: 999px; background: var(--border-strong); border: 0; padding: 0; transition: background .2s; flex: 0 0 auto; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .25); transition: transform .2s; }
+.switch[aria-checked="true"] { background: var(--primary); }
+.switch[aria-checked="true"]::after { transform: translateX(18px); }
+.inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.input, .select { width: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 8px 10px; background: var(--surface); color: var(--text); font: inherit; }
+.radio-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.rc { text-align: left; border: 1px solid var(--border-strong); border-radius: var(--r-md); padding: 12px; background: var(--surface); display: grid; gap: 4px; }
+.rc b { font-size: 0.875rem; display: flex; gap: 8px; align-items: center; }
+.rc span { color: var(--muted); font-size: 0.78rem; }
+.rc[aria-checked="true"] { border-color: var(--primary); background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
+.seg.btns { padding: 2px; }
+.seg.btns button { border: 0; background: transparent; padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; color: var(--text-2); }
+.seg.btns button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card); }
+.meter { display: grid; gap: 8px; }
+.meter-track { position: relative; height: 10px; border-radius: 999px; background: var(--subtle); border: 1px solid var(--border); overflow: visible; }
+.meter-fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 999px; background: var(--border-strong); transition: width .12s linear, background .2s; }
+.meter-fill.hit { background: var(--success); }
+.meter-th { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--primary); border-radius: 2px; }
+.meter-th::after { content: attr(data-v); position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; font-family: var(--font-mono); color: var(--primary); font-variant-numeric: tabular-nums; }
+.range { width: 100%; accent-color: var(--primary); }
+.scale { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); }
+.meter-msg { font-size: 0.8rem; color: var(--muted); min-height: 1.3em; }
+.meter-msg.ok { color: var(--success); font-weight: 600; }
+.note { font-size: 0.8rem; color: var(--text-2); background: var(--subtle); border-radius: var(--r-md); padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start; }
+.note svg { width: 16px; height: 16px; flex: 0 0 auto; margin-top: 2px; color: var(--primary); }
+.panel-foot { padding: 14px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border); background: var(--subtle); border-radius: 0 0 var(--r-lg) var(--r-lg); }
+.dim { opacity: .45; pointer-events: none; }
+
+/* ---------- reference ---------- */
+.states { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.st { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px; display: grid; gap: 8px; align-content: start; }
+.st h3 { display: flex; gap: 8px; align-items: center; font-size: 0.95rem; }
+.st h3 b { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+.st p { color: var(--text-2); font-size: 0.83rem; }
+.st .cue { font-size: 0.75rem; color: var(--muted); }
+.st .cue strong { color: var(--text-2); font-weight: 600; }
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+.rules ul { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--text-2); }
+.rules li b { color: var(--text); }
+.flow { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+.flow svg { min-width: 760px; width: 100%; height: auto; display: block; }
+.flow text { font-family: var(--font-sans); font-size: 12px; fill: var(--text); }
+.flow .sub { fill: var(--muted); font-size: 11px; }
+.flow .box { fill: var(--subtle); stroke: var(--border-strong); }
+.flow .box.p { fill: var(--primary-soft); stroke: var(--primary-border); }
+.flow .ln { stroke: var(--border-strong); stroke-width: 1.5; fill: none; }
+.flow .ln.p { stroke: var(--primary); }
+.flow .ah { fill: var(--border-strong); }
+.flow .ah.p { fill: var(--primary); }
+
+@media (max-width: 860px) {
+  .frame { grid-template-columns: minmax(0, 1fr); }
+  .side { display: none; }
+  .settings { grid-template-columns: minmax(0, 1fr); }
+  .set-nav { display: none; }
+  .row2 { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
+@media (max-width: 560px) {
+  .dock { grid-template-columns: auto minmax(0, 1fr); left: 10px; right: 10px; }
+  .dock-actions { grid-column: 1 / -1; grid-auto-flow: column; justify-content: space-between; align-items: center; }
+  .pill .long { display: none; }
+  .radio-cards { grid-template-columns: minmax(0, 1fr); }
+  .content { padding-inline: 12px; }
+  h1 { font-size: 1.6rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+  <symbol id="i-mic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V6a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.5 5.4M19 11a7 7 0 0 1-.6 2.8M12 18v3"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+  <symbol id="i-run" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+</svg>
+
+<main class="wrap">
+  <header style="display:grid;gap:10px">
+    <span class="eyebrow">Design proposal · AI Assistant › Generate cases</span>
+    <h1>Hands-free voice for the test-case generator</h1>
+    <p class="lede">Say <b>“Hey QA Studio”</b> to start talking to the generator. The wake phrase is detected inside the browser, and nothing is sent to LiveKit until it is heard. Step through the prototype below to see each state, then review the Settings › Voice panel that controls it.</p>
+  </header>
+
+  <!-- ===================== PROTOTYPE ===================== -->
+  <section aria-labelledby="proto-h">
+    <div class="sec-head">
+      <span class="eyebrow">Interactive prototype</span>
+      <h2 id="proto-h">From standby to saved cases</h2>
+      <p>Play the walkthrough, or pick any state. Press <kbd>Space</kbd> on the frame to simulate the wake phrase.</p>
+    </div>
+    <div class="controls">
+      <button class="btn primary" id="play" type="button"><svg><use href="#i-play"/></svg><span>Play walkthrough</span></button>
+      <button class="btn" id="wake" type="button"><svg><use href="#i-wave"/></svg>Simulate “Hey QA Studio”</button>
+      <button class="btn ghost" id="reset" type="button">Reset</button>
+    </div>
+    <nav class="stepper" id="stepper" aria-label="Voice states"></nav>
+
+    <div class="frame" id="frame" tabindex="0" aria-label="QA Studio prototype">
+      <aside class="side" aria-hidden="true">
+        <div class="brand"><i></i>QA Studio</div>
+        <div class="nav"><svg><use href="#i-grid"/></svg>Dashboard</div>
+        <div class="nav"><svg><use href="#i-list"/></svg>Test cases</div>
+        <div class="nav"><svg><use href="#i-run"/></svg>Runs</div>
+        <div class="nav-label">AI</div>
+        <div class="nav on"><svg><use href="#i-spark"/></svg>AI Assistant</div>
+        <div class="nav"><svg><use href="#i-cog"/></svg>Settings</div>
+      </aside>
+      <div class="main">
+        <div class="top">
+          <div class="crumbs">AI Assistant / <b>Generate cases</b></div>
+          <div id="pill" class="pill" role="status" aria-live="polite"></div>
+        </div>
+        <div id="coach" class="coach" hidden>
+          <strong>Voice wake is on</strong>
+          <p>Say <b style="color:#fff">“Hey QA Studio”</b> to start. Your microphone is checked on this computer only. Audio leaves the browser only after the phrase is heard.</p>
+          <div class="row"><span>Or hold <kbd>Ctrl</kbd> <kbd>Space</kbd></span><button type="button" id="coach-ok">Got it</button></div>
+        </div>
+        <div id="toast" class="toast" hidden><svg class="wave"><use href="#i-wave"/></svg><span>Heard “Hey QA Studio”</span></div>
+
+        <div class="content">
+          <div class="card">
+            <div class="card-head">
+              <h3>Describe what to test</h3>
+              <span class="tag">Project · Customer Portal</span>
+            </div>
+            <div id="desc" class="textarea"><span class="ph">e.g. Password reset from the sign-in page, including expired links</span></div>
+            <div class="opts">
+              <div class="opt"><span class="field-label">Coverage</span>
+                <div class="seg" id="cov"><span data-v="smoke">Smoke</span><span data-v="standard" class="on">Standard</span><span data-v="thorough">Thorough</span></div></div>
+              <div class="opt"><span class="field-label">Format</span>
+                <div class="seg" id="fmt"><span data-v="steps" class="on">Steps</span><span data-v="gherkin">Gherkin</span></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Proposed cases</h3><span class="m" id="count" style="color:var(--muted);font-size:.8rem">Nothing yet</span></div>
+            <div class="list" id="list"><div class="empty">Generated cases appear here for review. Nothing is saved until you confirm.</div></div>
+            <div class="savebar" id="savebar" hidden>
+              <span style="color:var(--muted);font-size:.8rem">Target suite · Sign-in</span>
+              <button class="btn primary" id="savebtn" type="button"><svg><use href="#i-check"/></svg><span>Save 6 cases</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dock" id="dock" hidden>
+          <div class="orb" id="orb" data-mode="listening">
+            <svg class="ring" viewBox="0 0 80 80" id="ring" hidden><circle cx="40" cy="40" r="37" id="ringc"/></svg>
+            <svg><use href="#i-mic"/></svg>
+          </div>
+          <div class="dock-body">
+            <div class="status" id="status">Listening</div>
+            <div class="say" id="say" aria-live="polite"></div>
+            <div class="chips" id="chips"></div>
+            <div class="hints" id="hints"></div>
+          </div>
+          <div class="dock-actions">
+            <button class="btn" type="button" id="end"><svg><use href="#i-x"/></svg>End</button>
+            <small><kbd>Esc</kbd> to end</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <section aria-labelledby="set-h">
+    <div class="sec-head">
+      <span class="eyebrow">Settings › Voice</span>
+      <h2 id="set-h">One switch, two activation modes, five generator fields</h2>
+      <p>Sits next to the existing AI section and uses the same save pattern. LiveKit keys come from server environment variables and are never shown here. Drag the sensitivity slider, then test it.</p>
+    </div>
+    <div class="settings">
+      <nav class="set-nav" aria-hidden="true"><span>Execution</span><span>Pages</span><span>AI</span><span class="on">Voice</span><span>Data</span><span>Audit</span><span>About</span></nav>
+      <div class="panel">
+        <div class="panel-head">
+          <div style="display:grid;gap:4px"><h3 style="font-size:1.05rem">Voice control</h3><p>Start, configure and run test-case generation by voice.</p></div>
+          <div class="inline"><div class="status-row"><span class="badge">LiveKit connected</span><span class="badge neutral" id="modelbadge">Wake model ready</span></div>
+            <button class="switch" id="sw-voice" role="switch" aria-checked="true" aria-label="Enable voice control" type="button"></button></div>
+        </div>
+
+        <div id="voice-body">
+          <div class="group">
+            <h3>Activation</h3>
+            <div class="radio-cards" role="radiogroup" aria-label="How voice starts">
+              <button class="rc" role="radio" aria-checked="false" data-mode="ptt" type="button"><b><svg width="16" height="16"><use href="#i-mic"/></svg>Push to talk</b><span>Click the mic or hold <kbd>Ctrl</kbd> <kbd>Space</kbd>. The microphone is used only while you talk.</span></button>
+              <button class="rc" role="radio" aria-checked="true" data-mode="wake" type="button"><b><svg width="16" height="16"><use href="#i-wave"/></svg>Wake phrase</b><span>Say the phrase to start, hands-free. Push to talk keeps working too.</span></button>
+            </div>
+            <div id="wake-opts" style="display:grid;gap:18px">
+              <div class="row2">
+                <div class="lbl"><label for="phrase">Wake phrase</label><span>Each phrase is a trained model. Ask an admin to add one.</span></div>
+                <select class="select" id="phrase"><option>Hey QA Studio</option><option>Hey LiveKit (built-in)</option></select>
+              </div>
+              <div class="row2">
+                <div class="lbl"><label for="sens">Sensitivity</label><span>Lower it if voice starts by itself. Raise it if you have to repeat the phrase.</span></div>
+                <div class="meter">
+                  <div class="meter-track"><div class="meter-fill" id="mfill"></div><div class="meter-th" id="mth" data-v="0.50"></div></div>
+                  <input class="range" type="range" id="sens" min="0.30" max="0.80" step="0.05" value="0.50" aria-describedby="mmsg">
+                  <div class="scale"><span>Wakes more easily</span><span>Fewer false starts</span></div>
+                  <div class="inline"><button class="btn" type="button" id="test"><svg><use href="#i-mic"/></svg>Test wake phrase</button><span class="meter-msg" id="mmsg">Say the phrase after you press Test.</span></div>
+                </div>
+              </div>
+              <div class="row2">
+                <div class="lbl"><label for="idle">End session after silence</label><span>Then voice goes back to waiting for the phrase.</span></div>
+                <select class="select" id="idle"><option>10 seconds</option><option selected>20 seconds</option><option>30 seconds</option><option>60 seconds</option></select>
+              </div>
+              <div class="row2">
+                <div class="lbl"><b>Only listen while QA Studio is open</b><span>Wake listening pauses when this tab is hidden or the computer locks.</span></div>
+                <div class="inline"><button class="switch" role="switch" aria-checked="true" aria-label="Pause when tab is hidden" type="button"></button></div>
+              </div>
+              <div class="row2">
+                <div class="lbl"><b>Sounds</b><span>A short tone when voice starts and when it stops.</span></div>
+                <div class="inline"><button class="switch" role="switch" aria-checked="true" aria-label="Play start and stop sounds" type="button"></button></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="group">
+            <h3>Generator</h3>
+            <div class="row2">
+              <div class="lbl"><label for="llm">Language model</label><span>Understands what you say and turns it into generator actions.</span></div>
+              <input class="input" id="llm" value="google/gemini-2.5-flash" list="llm-s">
+              <datalist id="llm-s"><option value="google/gemini-2.5-flash"><option value="openai/gpt-4.1-mini"></option></datalist>
+            </div>
+            <div class="row2">
+              <div class="lbl"><b>Coverage level</b><span>Default for voice requests. You can change it by saying “make it thorough”.</span></div>
+              <div class="seg btns" data-group="cov"><button type="button" aria-pressed="false">Smoke</button><button type="button" aria-pressed="true">Standard</button><button type="button" aria-pressed="false">Thorough</button></div>
+            </div>
+            <div class="row2">
+              <div class="lbl"><b>Output format</b><span>How steps are written in proposed cases.</span></div>
+              <div class="seg btns" data-group="fmt"><button type="button" aria-pressed="true">Steps</button><button type="button" aria-pressed="false">Gherkin</button></div>
+            </div>
+            <div class="row2">
+              <div class="lbl"><label for="lang">Spoken language</label><span>Language you speak to the assistant.</span></div>
+              <select class="select" id="lang"><option>English (en)</option><option>English, US (en-US)</option><option>English, UK (en-GB)</option></select>
+            </div>
+            <div class="note"><svg><use href="#i-shield"/></svg><span>Voice never saves on its own. Saying “save” shows the cases and asks you to confirm. Test-account passwords are never read aloud or sent to the model.</span></div>
+          </div>
+        </div>
+        <div class="panel-foot"><button class="btn ghost" type="button">Discard</button><button class="btn primary" type="button">Save voice settings</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FLOW ===================== -->
+  <section aria-labelledby="flow-h">
+    <div class="sec-head">
+      <span class="eyebrow">How wake-up works</span>
+      <h2 id="flow-h">Detect on the device, connect after the phrase</h2>
+      <p>The flow LiveKit documents for wake words. While waiting there is no LiveKit room, so idle tabs cost nothing and no audio leaves the browser.</p>
+    </div>
+    <div class="flow">
+      <svg viewBox="0 0 900 190" role="img" aria-label="Flow: microphone to on-device wake model, then on detection connect to LiveKit room, agent drives the generator via RPC, idle timeout returns to standby">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah p" d="M0 0L10 5L0 10z"/></marker>
+        </defs>
+        <rect class="box" x="10" y="40" width="150" height="70" rx="10"/><text x="85" y="70" text-anchor="middle">Microphone</text><text class="sub" x="85" y="88" text-anchor="middle">16 kHz, in the tab</text>
+        <rect class="box" x="200" y="40" width="170" height="70" rx="10"/><text x="285" y="70" text-anchor="middle">Wake model</text><text class="sub" x="285" y="88" text-anchor="middle">ONNX in a Web Worker</text>
+        <rect class="box p" x="420" y="40" width="190" height="70" rx="10"/><text x="515" y="70" text-anchor="middle">LiveKit room</text><text class="sub" x="515" y="88" text-anchor="middle">token from qa-api</text>
+        <rect class="box p" x="660" y="40" width="230" height="70" rx="10"/><text x="775" y="70" text-anchor="middle">qa-studio agent</text><text class="sub" x="775" y="88" text-anchor="middle">RPC → Generate cases panel</text>
+        <path class="ln" d="M160 75H198" marker-end="url(#a1)"/>
+        <path class="ln p" d="M370 75H418" marker-end="url(#a2)"/><text class="sub" x="394" y="62" text-anchor="middle">score ≥ 0.5</text>
+        <path class="ln p" d="M610 75H658" marker-end="url(#a2)"/><text class="sub" x="634" y="62" text-anchor="middle">dispatch</text>
+        <path class="ln" d="M775 110V150H285V112" marker-end="url(#a1)"/>
+        <text class="sub" x="530" y="168" text-anchor="middle">“That’s all”, End, Esc or 20 s of silence → disconnect, back to standby</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ===================== STATES ===================== -->
+  <section aria-labelledby="st-h">
+    <div class="sec-head">
+      <span class="eyebrow">State reference</span>
+      <h2 id="st-h">What the user sees and hears in each state</h2>
+    </div>
+    <div class="states" id="states"></div>
+  </section>
+
+  <section aria-labelledby="rules-h">
+    <div class="sec-head"><span class="eyebrow">Behaviour rules</span><h2 id="rules-h">Decisions behind the design</h2></div>
+    <div class="rules">
+      <ul>
+        <li><b>The mic indicator is always visible.</b> In standby the top bar shows a breathing dot and the phrase. Users always know QA Studio can hear them.</li>
+        <li><b>The hint teaches the phrase.</b> The pill shows the exact words to say. A one-time coach mark explains privacy, and push to talk is always shown as a fallback.</li>
+        <li><b>Wake gets confirmation within 300 ms.</b> A tone, a toast and the dock appear before the room finishes connecting, so a missed wake is obvious.</li>
+      </ul>
+      <ul>
+        <li><b>What voice changes is shown on screen.</b> Coverage and format controls flash when voice sets them, and the description field is marked “from voice”.</li>
+        <li><b>Saving always needs a confirmation.</b> The agent asks, and the Save button is highlighted at the same time. Saying “yes” or clicking does the same thing.</li>
+        <li><b>It talks like a colleague.</b> Short turns, plain acknowledgements (“Got it”), and you can interrupt at any time. It asks one question at a time, with choices, only when the answer changes the cases.</li>
+        <li><b>It asks instead of guessing.</b> Missing roles, flows or data become a question, never an invented URL or value. “You decide” lets the agent pick and say what it assumed.</li>
+        <li><b>The session ends predictably.</b> A ring counts down the last 8 seconds of silence. Any speech resets it.</li>
+      </ul>
+      <ul>
+        <li><b>Errors say how to fix them.</b> For a blocked mic, show the browser’s site-settings path. If LiveKit is not set up, name the server variables.</li>
+        <li><b>Keyboard users get parity.</b> <kbd>Ctrl</kbd> <kbd>Space</kbd> talks, <kbd>Esc</kbd> ends, and state changes are announced through a polite live region.</li>
+        <li><b>Respects reduced motion.</b> The orb and ripples stop moving. State is still shown by labels and colour.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const CASES = [
+    ['Reset link is sent for a registered email', 'High', 'Sign-in › Forgot password'],
+    ['Unknown email shows the same neutral message', 'High', 'Security'],
+    ['Expired reset link shows “Link expired”', 'High', 'Sign-in › Reset'],
+    ['New password must meet the strength rules', 'Medium', 'Sign-in › Reset'],
+    ['Signed-in user cannot open the reset page', 'Medium', 'Permissions'],
+    ['Locked account cannot request a reset link', 'Medium', 'Security'],
+  ];
+  // Full steps for the first case, so reviewers see the step quality the generator must reach.
+  const STEPS = {
+    pre: 'A registered user exists with email {{data.registeredEmail}}.',
+    steps: ['Go to the Sign in page', 'Click the Forgot password link', 'Enter {{data.registeredEmail}} in the Email field', 'Click the Send reset link button', 'Verify ‘Check your email for a reset link’ is displayed'],
+    exp: 'A confirmation message is shown and a reset email is sent to the address.',
+  };
+  const DESC = 'Generate test cases for password reset on the sign-in page, including expired links';
+
+  // One entry per state. "auto" is how long the walkthrough stays on it.
+  const STATES = [
+    { id: 'standby', label: 'Standby', auto: 2600, pill: 'standby', coach: true,
+      ref: ['Waiting for the phrase', 'The pill breathes green and shows “Say ‘Hey QA Studio’”. A coach mark appears the first time.', 'Silent. No LiveKit room.'] },
+    { id: 'detected', label: 'Wake heard', auto: 1300, pill: 'live', toast: true, dock: { mode: 'connecting', status: 'Connecting…', say: '', hints: [] },
+      ref: ['Wake phrase heard', 'A toast confirms the phrase. The dock slides up while the room connects (target under 1 s).', 'Start tone.'] },
+    { id: 'listen1', label: 'Listening', auto: 2600, pill: 'live', descVoice: 'interim', dock: { mode: 'listening', status: 'Listening', say: 'interim', hints: ['“Generate cases for …”', '“Make it thorough”', '“Use Gherkin”'] },
+      ref: ['Listening', 'The live transcript appears in the dock as you speak. Example commands appear until you start talking.', 'None. Barge-in is allowed.'] },
+    { id: 'listen2', label: 'Option set', auto: 2200, pill: 'live', descVoice: 'final', cov: 'thorough', dock: { mode: 'listening', status: 'Listening', say: 'final2', chips: ['Coverage → Thorough'], hints: [] },
+      ref: ['Option set by voice', 'The setting it changed flashes, and a chip in the dock records what changed.', 'None.'] },
+    { id: 'clarify', label: 'Asks back', auto: 3400, pill: 'live', descVoice: 'final', cov: 'thorough', dock: { mode: 'speaking', status: 'QA Studio has a question', say: 'clarify', chips: ['Coverage → Thorough'], hints: ['“Email link only”', '“Both”', '“You decide”'] },
+      ref: ['Asks for clarification', 'When the request is ambiguous or missing something, the agent asks one short question with choices before generating. It never guesses URLs, roles or data.', 'Agent voice, then listens.'] },
+    { id: 'answer', label: 'You answer', auto: 2400, pill: 'live', descVoice: 'clarified', cov: 'thorough', dock: { mode: 'listening', status: 'Listening', say: 'answer', chips: ['Coverage → Thorough', 'Reset by email link', '+ Locked accounts'], hints: [] },
+      ref: ['Answer folded in', 'The answer is added to the description and shown as chips, so you can check what the agent understood.', 'Short acknowledgement (“Got it”).'] },
+    { id: 'thinking', label: 'Generating', auto: 2000, pill: 'live', descVoice: 'final', cov: 'thorough', skel: true, dock: { mode: 'thinking', status: 'Generating cases', say: 'final2', chips: ['Coverage → Thorough'], hints: [] },
+      ref: ['Generating', 'Placeholder rows show progress. The orb speeds up. Say “cancel” to stop.', 'Optional soft tick after 3 s.'] },
+    { id: 'speaking', label: 'Agent replies', auto: 3200, pill: 'live', descVoice: 'final', cov: 'thorough', cases: true, dock: { mode: 'speaking', status: 'QA Studio is speaking', say: 'agent', chips: ['6 cases proposed'], hints: ['Speak to interrupt'] },
+      ref: ['Reading back', 'Cases fill the list as they arrive. The spoken summary names the count and the first title.', 'Agent voice.'] },
+    { id: 'confirm', label: 'Confirm save', auto: 2600, pill: 'live', descVoice: 'final', cov: 'thorough', cases: true, save: 'pulse', dock: { mode: 'listening', status: 'Waiting for confirmation', say: 'confirm', chips: ['Save 6 cases to Sign-in?'], hints: ['“Yes”', '“No, only the first three”'] },
+      ref: ['Confirm before saving', 'The Save button is highlighted at the same moment the agent asks. Voice and click both work.', 'Agent question.'] },
+    { id: 'idle', label: 'Winding down', auto: 3000, pill: 'live', descVoice: 'final', cov: 'thorough', cases: 'saved', dock: { mode: 'idle', status: 'Saved · ending in 8 s', say: 'saved', chips: ['6 cases saved'], hints: ['Say anything to keep going'], ring: true },
+      ref: ['Idle countdown', 'A ring counts down the last 8 s of silence. Any speech resets it.', 'Stop tone at the end.'] },
+    { id: 'micblocked', label: 'Mic blocked', auto: 0, err: true, pill: 'err',
+      ref: ['Microphone blocked', 'The pill turns red. Clicking it explains how to allow the microphone in site settings.', 'None.'] },
+  ];
+  const SAY = {
+    interim: '<span class="who">You</span>Generate test cases for password reset <span class="interim">on the sign-in…</span>',
+    final2: '<span class="who">You</span>…including expired links. Make it thorough.',
+    clarify: '<span class="who">QA Studio</span>Sure. Quick check first: does reset work by email link, by SMS code, or both? And should I cover locked accounts too?',
+    answer: '<span class="who">You</span>Email link only. Yes, add locked accounts.<br><span class="who">QA Studio</span>Got it, writing them now.',
+    agent: '<span class="who">QA Studio</span>I drafted 6 cases. The first is “Reset link is sent for a registered email”. Should I save them to Sign-in?',
+    confirm: '<span class="who">You</span>Save all six.<br><span class="who">QA Studio</span>Saving 6 cases to Sign-in. Say yes to confirm.',
+    saved: '<span class="who">QA Studio</span>Done. 6 cases saved to Sign-in.',
+  };
+
+  let idx = 0, timer = null, playing = false, coachDismissed = false, ringTimer = null;
+
+  const stepper = $('stepper');
+  STATES.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'step' + (s.err ? ' err' : '');
+    b.innerHTML = `<b>${s.err ? '!' : i + 1}</b>${s.label}`;
+    b.addEventListener('click', () => { stop(); go(i); });
+    stepper.appendChild(b);
+  });
+
+  function pillHTML(kind) {
+    if (kind === 'standby') return `<span class="dot" aria-hidden="true"></span><span><span class="long">Say </span><span class="phrase">“Hey QA Studio”</span></span><kbd class="long">Ctrl Space</kbd>`;
+    if (kind === 'live') return `<span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Voice on</span><button class="x" type="button" aria-label="End voice session" data-end><svg width="12" height="12"><use href="#i-x"/></svg></button>`;
+    if (kind === 'err') return `<svg class="ico"><use href="#i-mic-off"/></svg><span>Microphone blocked<span class="long"> · Allow in site settings</span></span>`;
+    return `<svg class="ico"><use href="#i-mic"/></svg><span>Voice</span><kbd>Ctrl Space</kbd>`;
+  }
+  function setSeg(id, v, flash) {
+    $(id).querySelectorAll('span').forEach((sp) => {
+      sp.classList.toggle('on', sp.dataset.v === v);
+      sp.classList.remove('flash');
+      if (flash && sp.dataset.v === v) { sp.classList.add('flash'); setTimeout(() => sp.classList.remove('flash'), 700); }
+    });
+  }
+
+  function go(i) {
+    const prev = STATES[idx];
+    idx = i;
+    const s = STATES[i];
+    [...stepper.children].forEach((c, n) => c.toggleAttribute('aria-current', n === i) || c.setAttribute('aria-current', n === i ? 'step' : 'false'));
+    [...stepper.children].forEach((c, n) => { if (n === i) c.setAttribute('aria-current', 'step'); else c.removeAttribute('aria-current'); });
+
+    const pill = $('pill');
+    pill.className = 'pill' + (s.pill === 'live' ? ' live' : s.pill === 'err' ? ' err' : '');
+    pill.innerHTML = pillHTML(s.pill);
+    $('coach').hidden = !(s.coach && !coachDismissed);
+    $('toast').hidden = !s.toast;
+
+    const desc = $('desc');
+    desc.classList.toggle('voice', s.descVoice === 'interim');
+    if (!s.descVoice) desc.innerHTML = '<span class="ph">e.g. Password reset from the sign-in page, including expired links</span>';
+    else if (s.descVoice === 'interim') desc.innerHTML = 'Generate test cases for password reset <span class="ph">on the sign-in…</span>';
+    else if (s.descVoice === 'clarified') desc.innerHTML = DESC + '. Reset is by email link only. Include locked accounts.<span class="src"><svg width="12" height="12"><use href="#i-wave"/></svg>from voice</span>';
+    else desc.innerHTML = DESC + (idx > STATES.findIndex((x) => x.id === 'answer') ? '. Reset is by email link only. Include locked accounts.' : '') + '<span class="src"><svg width="12" height="12"><use href="#i-wave"/></svg>from voice</span>';
+    setSeg('cov', s.cov || 'standard', s.cov && prev.cov !== s.cov);
+    setSeg('fmt', 'steps');
+
+    const list = $('list');
+    if (s.skel) { list.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; $('count').textContent = 'Generating…'; }
+    else if (s.cases) {
+      list.innerHTML = CASES.map(([t, p, m], n) => `<div class="case" style="animation-delay:${n * 90}ms"><span class="chk"><svg width="12" height="12"><use href="#i-check"/></svg></span><div><div class="t">${t}</div><div class="m">${m}</div>${n === 0 ? `<details class="steps" open><summary>Steps</summary><p class="pre"><b>Precondition</b> ${STEPS.pre}</p><ol>${STEPS.steps.map((x) => `<li>${x}</li>`).join('')}</ol><p class="pre"><b>Expected</b> ${STEPS.exp}</p></details>` : `<details class="steps"><summary>Steps</summary><p class="pre">5 steps · 1 expected result</p></details>`}</div><span class="tag ${p === 'High' ? 'hi' : p === 'Medium' ? 'md' : ''}">${p}</span></div>`).join('');
+      $('count').textContent = s.cases === 'saved' ? '6 saved' : '6 proposed · 6 selected';
+    } else { list.innerHTML = '<div class="empty">Generated cases appear here for review. Nothing is saved until you confirm.</div>'; $('count').textContent = 'Nothing yet'; }
+    $('savebar').hidden = !s.cases;
+    const sb = $('savebtn');
+    sb.classList.toggle('pulse', s.save === 'pulse');
+    sb.querySelector('span').textContent = s.cases === 'saved' ? 'Saved' : 'Save 6 cases';
+
+    const dock = $('dock');
+    clearInterval(ringTimer);
+    if (!s.dock) { dock.hidden = true; }
+    else {
+      dock.hidden = false;
+      $('orb').dataset.mode = s.dock.mode;
+      $('status').textContent = s.dock.status;
+      $('status').classList.toggle('warn', s.dock.mode === 'idle');
+      $('say').innerHTML = SAY[s.dock.say] || '<span class="interim">Go ahead, I’m listening.</span>';
+      $('chips').innerHTML = (s.dock.chips || []).map((c) => `<span class="chip">${c}</span>`).join('');
+      $('hints').innerHTML = (s.dock.hints || []).map((h) => `<span class="hint">${h}</span>`).join('');
+      const ring = $('ring'), c = $('ringc'), L = 2 * Math.PI * 37;
+      ring.hidden = !s.dock.ring;
+      if (s.dock.ring) {
+        let left = 8; c.style.strokeDasharray = L; c.style.strokeDashoffset = 0;
+        ringTimer = setInterval(() => { left -= 1; c.style.strokeDashoffset = L * (1 - left / 8); $('status').textContent = `Saved · ending in ${Math.max(left, 0)} s`; if (left <= 0) clearInterval(ringTimer); }, 1000);
+      }
+    }
+    if (playing) {
+      clearTimeout(timer);
+      const next = i + 1 < STATES.length && !STATES[i + 1].err ? i + 1 : 0;
+      timer = setTimeout(() => { if (next === 0) { stop(); go(0); } else go(next); }, s.auto || 2000);
+    }
+  }
+  function play() { playing = true; $('play').querySelector('span').textContent = 'Playing…'; go(idx >= STATES.length - 2 ? 0 : idx); }
+  function stop() { playing = false; clearTimeout(timer); $('play').querySelector('span').textContent = 'Play walkthrough'; }
+
+  $('play').addEventListener('click', () => (playing ? stop() : play()));
+  $('reset').addEventListener('click', () => { stop(); coachDismissed = false; go(0); });
+  $('wake').addEventListener('click', () => { stop(); go(1); setTimeout(() => { if (!playing && idx === 1) go(2); }, 1300); });
+  $('coach-ok').addEventListener('click', () => { coachDismissed = true; $('coach').hidden = true; });
+  $('end').addEventListener('click', () => { stop(); go(0); });
+  $('pill').addEventListener('click', (e) => { if (e.target.closest('[data-end]')) { stop(); go(0); } });
+  $('frame').addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && idx === 0) { e.preventDefault(); $('wake').click(); }
+    if (e.key === 'Escape') { stop(); go(0); }
+  });
+
+  // reference cards
+  $('states').innerHTML = STATES.map((s, i) => `<article class="st"><h3><b>${s.err ? 'ERR' : String(i + 1).padStart(2, '0')}</b>${s.ref[0]}</h3><p>${s.ref[1]}</p><span class="cue"><strong>Sound:</strong> ${s.ref[2]}</span></article>`).join('');
+
+  // ---------- settings interactions ----------
+  const body = $('voice-body');
+  $('sw-voice').addEventListener('click', (e) => {
+    const on = e.currentTarget.getAttribute('aria-checked') !== 'true';
+    e.currentTarget.setAttribute('aria-checked', String(on));
+    body.classList.toggle('dim', !on);
+  });
+  document.querySelectorAll('.panel .switch:not(#sw-voice)').forEach((s) => s.addEventListener('click', () => s.setAttribute('aria-checked', String(s.getAttribute('aria-checked') !== 'true'))));
+  document.querySelectorAll('.rc').forEach((rc) => rc.addEventListener('click', () => {
+    document.querySelectorAll('.rc').forEach((r) => r.setAttribute('aria-checked', String(r === rc)));
+    $('wake-opts').classList.toggle('dim', rc.dataset.mode !== 'wake');
+    $('modelbadge').textContent = rc.dataset.mode === 'wake' ? 'Wake model ready' : 'Wake model off';
+  }));
+  document.querySelectorAll('.seg.btns').forEach((g) => g.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+  const sens = $('sens'), th = $('mth');
+  const placeTh = () => { const v = +sens.value; const pct = ((v - 0) / 1) * 100; th.style.left = `calc(${pct}% - 1px)`; th.dataset.v = v.toFixed(2); };
+  sens.addEventListener('input', placeTh); placeTh();
+  let testing = null;
+  $('test').addEventListener('click', () => {
+    clearInterval(testing);
+    const fill = $('mfill'), msg = $('mmsg');
+    msg.className = 'meter-msg'; msg.textContent = 'Listening… say “Hey QA Studio”';
+    // Simulated score curve: noise, then the phrase peaks at 0.72.
+    const curve = [0.04, 0.08, 0.05, 0.11, 0.07, 0.18, 0.41, 0.66, 0.72, 0.58, 0.22, 0.09, 0.05];
+    let n = 0;
+    testing = setInterval(() => {
+      const v = curve[n++]; fill.style.width = (v * 100) + '%';
+      const hit = v >= +sens.value; fill.classList.toggle('hit', hit);
+      if (hit) { msg.className = 'meter-msg ok'; msg.textContent = `Heard it. Peak score ${Math.max(...curve.slice(0, n)).toFixed(2)} is above ${(+sens.value).toFixed(2)}.`; }
+      if (n >= curve.length) {
+        clearInterval(testing); fill.style.width = '0'; fill.classList.remove('hit');
+        if (0.72 < +sens.value) { msg.className = 'meter-msg'; msg.textContent = `Not heard. Peak 0.72 is below ${(+sens.value).toFixed(2)}. Try a lower setting.`; }
+      }
+    }, 160);
+  });
+
+  go(0);
+})();
+</script>

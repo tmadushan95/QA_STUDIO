@@ -1,0 +1,169 @@
+/* Azure DevOps page. */
+.page {
+  display: grid;
+  gap: var(--space-5);
+}
+/* Grid children may shrink below their content (a tab strip, a wide table), so the page never scrolls sideways. */
+.page > * {
+  min-width: 0;
+}
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-lg);
+  background: var(--gradient-hero);
+  list-style: none;
+}
+.flow li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.flowNo {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--gradient-brand);
+  color: var(--color-text-inverse);
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.fieldset {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.fieldset legend {
+  padding: 0 var(--space-1);
+  font-weight: var(--weight-semibold);
+}
+.jobs {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.job {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.jobHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.stages {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stage {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-top: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-subtle);
+}
+.stage_running {
+  border-top-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.stage_done {
+  border-top-color: var(--color-success);
+}
+.stage_failed {
+  border-top-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+.stage_skipped {
+  opacity: 0.7;
+}
+.stageName {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.stageState {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-transform: capitalize;
+}
+.stageMsg {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.code {
+  overflow-x: auto;
+  margin: 0 0 var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-nav);
+  color: #dbe3ff;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+@media (max-width: 72rem) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stages {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 40rem) {
+  .pair,
+  .stages {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,0 +1,241 @@
+/* The Projects list and one project's setup page. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-4);
+  list-style: none;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  position: relative;
+}
+/*
+ * The whole card opens the project: the title link stretches over it, so the card stays one link for keyboards and
+ * screen readers instead of a clickable <li>.
+ */
+.cardLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+/* The actions menu sits above the stretched link, so it still opens its own menu. */
+.cardActions {
+  position: relative;
+  z-index: 1;
+}
+.card:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cardTitle {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+.code {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.address {
+  min-height: 1.5em;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: auto 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.configure {
+  align-self: flex-start;
+}
+
+/* One project's page */
+.page {
+  display: grid;
+  gap: var(--space-5);
+}
+.back {
+  display: inline-flex;
+  width: fit-content;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.pageHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.pageTitle {
+  margin: 0;
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+.pageActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Setup progress: three short statuses, in the order a person sets them up. */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.stepDone {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+}
+.stepTodo {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+.stepName {
+  display: block;
+  font-weight: var(--weight-medium);
+}
+.stepDetail {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 44rem;
+}
+.twoFields {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+/* Sign-in method: whole cards to press, so the choice is an easy target on a phone. */
+.methods {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.methods legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-weight: var(--weight-medium);
+}
+.method {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.method:hover {
+  background: var(--color-hover);
+}
+.method:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.methodOn {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.method input {
+  margin-top: 4px;
+  accent-color: var(--color-primary);
+}
+.methodHint {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}
+
+/* Test accounts */
+.accounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.accountName {
+  flex: 1;
+  min-width: 12rem;
+  overflow-wrap: anywhere;
+}
+.accountUser {
+  display: block;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 47.5rem) {
+  .steps,
+  .twoFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grid {
+    padding: var(--space-3);
+  }
+}

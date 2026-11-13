@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_09",
+  "description": "No Delete button on a project that is past Draft/Rejected (UI half only; the API refusal is not exercised)",
+  "steps": [
+    {
+      "action": "projects.open-from-list",
+      "params": {
+        "list": "open",
+        "code": "{{data.openProject}}"
+      }
+    },
+    {
+      "action": "project.assert-delete-button",
+      "params": {
+        "visible": false
+      }
+    },
+    {
+      "action": "projects.open-from-list",
+      "params": {
+        "list": "mine",
+        "code": "{{data.myProject}}"
+      }
+    },
+    {
+      "action": "project.assert-delete-button",
+      "params": {
+        "visible": false
+      }
+    }
+  ]
+}

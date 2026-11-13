@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_30",
+  "description": "DELETES a Draft project; it stays gone when the list is loaded again",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.deleteTc30}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.confirm-delete",
+      "params": {
+        "lrp": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "draft",
+        "code": "{{data.deleteTc30}}",
+        "listed": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "draft",
+        "code": "{{data.deleteTc30}}",
+        "listed": false
+      }
+    }
+  ]
+}

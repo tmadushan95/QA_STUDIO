@@ -1,0 +1,151 @@
+/* DataTable organism. */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  /* Never wider than its column, so a wide table scrolls inside itself rather than widening the page. */
+  min-width: 0;
+  max-width: 100%;
+}
+/*
+ * The rows scroll inside the table (both ways), so a long or wide table never scrolls the page. The height comes from
+ * DataTable's --rows-max-height (the room left in the window below the table's top), but never below 15rem so a
+ * table that starts low still shows a few rows. The column headers stay pinned while the rows scroll.
+ */
+.scroll {
+  overflow: auto;
+  max-height: max(15rem, var(--rows-max-height, 70vh));
+}
+.scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  box-shadow: 0 1px 0 var(--color-border);
+}
+/*
+ * Sticky headers: an ancestor with hidden or scrolling overflow would trap `position: sticky` (and clip popovers in
+ * cells), so a sticky table lets its content overflow and rounds its corner cells instead of clipping them.
+ * Such a table wraps rather than scrolls sideways.
+ */
+.sticky,
+.sticky .scroll {
+  overflow: visible;
+  max-height: none;
+}
+.sticky thead th:first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+.sticky thead th:last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+.sticky tbody tr:last-child > :first-child {
+  border-bottom-left-radius: var(--radius-lg);
+}
+.sticky tbody tr:last-child > :last-child {
+  border-bottom-right-radius: var(--radius-lg);
+}
+.sticky thead th {
+  position: sticky;
+  top: var(--sticky-top, 0);
+  z-index: 5;
+  box-shadow: 0 1px 0 var(--color-border);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+.table thead th {
+  background: var(--color-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.table tbody tr:hover {
+  background: var(--color-subtle);
+}
+.table tbody th {
+  font-weight: var(--weight-semibold);
+}
+.selected {
+  background: var(--color-primary-soft) !important;
+}
+.shrink {
+  width: 1%;
+  white-space: nowrap;
+}
+.end {
+  text-align: right !important;
+}
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.pagerButtons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Phones: one card per row, each cell labelled with its column. */
+@media (max-width: 47.5rem) {
+  /* Row cards read best in one continuous page scroll; a box scrolling inside the page is awkward on touch. */
+  .scroll {
+    max-height: none;
+  }
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .table tr {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .table th,
+  .table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    grid-column: 2;
+    text-align: left !important;
+  }
+  .table td.shrink:first-child {
+    grid-column: 1;
+    grid-row: 1 / span 6;
+  }
+  .table [data-label]:not([data-label=''])::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+  .shrink {
+    width: auto;
+  }
+}

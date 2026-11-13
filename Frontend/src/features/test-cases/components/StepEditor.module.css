@@ -1,0 +1,203 @@
+/*
+ * Step editor: one card per step. A header (number, action, menu), a sentence saying what the step does, then the
+ * fields with their labels above. Fields flow into as many columns as fit, so cards stay short on wide popups and
+ * stack on phones.
+ */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.noSteps {
+  padding: var(--space-6);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm, none);
+}
+.row:hover {
+  border-color: var(--color-border-strong);
+}
+.invalid {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.number {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-hover);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+.action {
+  flex: 0 1 18rem;
+  min-width: 0;
+  font-weight: var(--weight-semibold);
+}
+.danger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-danger);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+.rowMenu {
+  margin-left: auto;
+}
+.sentence {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.sentence svg {
+  flex: none;
+  margin-top: 3px;
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.wide {
+  grid-column: 1 / -1;
+}
+.fieldLabel {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.fieldLabel abbr {
+  color: var(--color-danger);
+  text-decoration: none;
+}
+.help {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.target {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.findBy,
+.within {
+  min-width: 0;
+}
+.withData {
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.withData > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.dataPicker {
+  width: 3.5rem;
+  flex: none;
+  padding-right: var(--space-5);
+  font-family: var(--font-mono);
+}
+.narrow {
+  max-width: 7rem;
+}
+.extra {
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.extra summary {
+  cursor: pointer;
+  font-weight: var(--weight-medium);
+}
+.raw {
+  width: 100%;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+}
+.messages li {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+.issue {
+  color: var(--color-danger);
+  font-weight: var(--weight-medium);
+}
+.warning {
+  color: var(--color-warning);
+}
+.addRow {
+  display: flex;
+  gap: var(--space-2);
+}
+@media (max-width: 47.5rem) {
+  .head {
+    flex-wrap: wrap;
+  }
+  .action {
+    flex: 1 1 10rem;
+  }
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .target {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

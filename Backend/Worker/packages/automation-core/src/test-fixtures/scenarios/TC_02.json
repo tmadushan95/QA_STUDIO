@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_02",
+  "description": "Delete button on a Draft and a Rejected project (user with the permission)",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.draftProject}}"
+      }
+    },
+    {
+      "action": "project.assert-delete-button",
+      "params": {
+        "visible": true
+      }
+    },
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.rejectedProject}}"
+      }
+    },
+    {
+      "action": "project.assert-delete-button",
+      "params": {
+        "visible": true
+      }
+    }
+  ]
+}

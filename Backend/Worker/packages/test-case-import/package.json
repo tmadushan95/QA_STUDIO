@@ -1,0 +1,12 @@
+{
+  "name": "@qa-studio/test-case-import",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@qa-studio/shared": "0.1.0",
+    "exceljs": "4.4.0"
+  }
+}

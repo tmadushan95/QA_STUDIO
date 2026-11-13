@@ -1,0 +1,2 @@
+#!/bin/sh
+cd "$(dirname "$0")/Worker" && QA_OPEN_BROWSER=true exec npm start

@@ -1,0 +1,124 @@
+/* Dialog organism. Phones get a full-screen sheet; larger screens a centred card. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: rgb(15 23 42 / 0.45);
+  animation: fade 120ms ease;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100vh - 3rem);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+  animation: rise 160ms ease;
+}
+.sm {
+  max-width: 25rem;
+}
+.md {
+  max-width: 40rem;
+}
+.lg {
+  max-width: 60rem;
+  height: min(52rem, calc(100vh - 3rem));
+}
+.expanded {
+  max-width: none;
+  height: calc(100vh - 3rem);
+}
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+.titles {
+  min-width: 0;
+}
+.title {
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+.subtitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+.headerActions {
+  display: flex;
+  gap: var(--space-1);
+  flex: none;
+}
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-subtle);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.confirmText {
+  color: var(--color-text-secondary);
+}
+.typeToConfirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+}
+.typeToConfirm input {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (max-width: 40rem) {
+  .backdrop {
+    padding: 0;
+    place-items: end stretch;
+  }
+  .panel,
+  .lg,
+  .expanded {
+    max-width: none;
+    height: 100vh;
+    max-height: none;
+    border-radius: 0;
+  }
+  .footer {
+    border-radius: 0;
+  }
+}

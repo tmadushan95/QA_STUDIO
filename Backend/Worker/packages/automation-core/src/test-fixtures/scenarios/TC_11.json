@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_11",
+  "description": "DELETES one linked child; the remaining children of the clubbed project are unchanged",
+  "steps": [
+    {
+      "action": "clubbed.remember-children",
+      "params": {
+        "code": "{{data.clubbedParentTc11}}"
+      }
+    },
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.draftChildTc11}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.assert-delete-dialog",
+      "params": {
+        "kind": "linked",
+        "clubbedCode": "{{data.clubbedParentTc11}}"
+      }
+    },
+    {
+      "action": "project.confirm-delete",
+      "params": {
+        "lrp": false
+      }
+    },
+    {
+      "action": "clubbed.assert-children-unchanged",
+      "params": {
+        "deletedCode": "{{data.draftChildTc11}}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@qa-studio/qa-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@fastify/multipart": "9.0.3",
+    "@qa-studio/agents": "0.1.0",
+    "@qa-studio/automation-core": "0.1.0",
+    "@qa-studio/execution-engine": "0.1.0",
+    "@qa-studio/knowledge": "0.1.0",
+    "@qa-studio/llm": "0.1.0",
+    "@qa-studio/reporting": "0.1.0",
+    "@qa-studio/shared": "0.1.0",
+    "@qa-studio/test-case-import": "0.1.0",
+    "fastify": "5.12.7",
+    "livekit-server-sdk": "2.19.2",
+    "zod": "4.6.7"
+  }
+}

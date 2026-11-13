@@ -1,0 +1,17 @@
+{
+  "name": "@qa-studio/qa-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "qa-studio-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  }
+}

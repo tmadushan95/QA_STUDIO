@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_10",
+  "description": "DELETES a Draft child linked to a clubbed project; the confirmation names the parent",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.linkedChildTc10}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.assert-delete-dialog",
+      "params": {
+        "kind": "linked",
+        "clubbedCode": "{{data.clubbedCode}}"
+      }
+    },
+    {
+      "action": "project.confirm-delete",
+      "params": {
+        "lrp": false
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "draft",
+        "code": "{{data.linkedChildTc10}}",
+        "listed": false
+      }
+    }
+  ]
+}

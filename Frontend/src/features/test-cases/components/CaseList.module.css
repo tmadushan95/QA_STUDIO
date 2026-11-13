@@ -1,0 +1,179 @@
+/* Shared list styles of Test Design and Test Execution. */
+.stack {
+  display: grid;
+  gap: var(--space-5);
+}
+.stack > * {
+  min-width: 0;
+}
+.panel {
+  padding-top: var(--space-5);
+  outline: none;
+}
+
+/* Summary strip: one clickable card per state, so the next thing to do is one click away. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration) var(--ease),
+    transform var(--duration) var(--ease);
+}
+.stat:hover {
+  border-color: var(--color-primary-border);
+  transform: translateY(-1px);
+}
+.statActive {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+.statLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.statValue {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+}
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+/* Context and filters. */
+/* Wraps by available width, not viewport, because the bar sits beside a side panel on some pages. */
+.context {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+  align-items: end;
+}
+.contextLabel {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+.hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-3);
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.toggle input {
+  accent-color: var(--color-primary);
+  width: 1rem;
+  height: 1rem;
+}
+.bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+}
+
+/* Table cells. */
+.idLink {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.idLink:hover {
+  text-decoration: underline;
+}
+.title {
+  display: flex;
+  flex-direction: column;
+  /* Titles are the main thing people read: keep them readable before other columns get room. */
+  min-width: 14rem;
+}
+.sub {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.last {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lastLine {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.ok {
+  color: var(--color-success);
+  font-weight: var(--weight-bold);
+}
+.jobs {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (max-width: 64rem) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 40rem) {
+  .statValue {
+    font-size: var(--text-lg);
+  }
+}

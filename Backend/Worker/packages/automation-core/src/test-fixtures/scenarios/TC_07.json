@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_07",
+  "description": "Cancel leaves the project in place",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "draft",
+        "code": "{{data.draftProject}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.cancel-delete",
+      "params": {}
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "draft",
+        "code": "{{data.draftProject}}",
+        "listed": true
+      }
+    }
+  ]
+}

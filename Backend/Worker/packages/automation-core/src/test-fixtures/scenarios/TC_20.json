@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "caseId": "TC_20",
+  "description": "An LRP project that belongs to an LRP cycle is refused deletion and stays listed",
+  "steps": [
+    {
+      "action": "drafts.open-project",
+      "params": {
+        "list": "lrp",
+        "code": "{{data.lrpInCycle}}"
+      }
+    },
+    {
+      "action": "project.click-delete",
+      "params": {}
+    },
+    {
+      "action": "project.assert-delete-dialog",
+      "params": {
+        "kind": "lrp"
+      }
+    },
+    {
+      "action": "project.confirm-delete-expect-error",
+      "params": {
+        "message": "linked to an LRP cycle"
+      }
+    },
+    {
+      "action": "drafts.assert-listed",
+      "params": {
+        "list": "lrp",
+        "code": "{{data.lrpInCycle}}",
+        "listed": true
+      }
+    }
+  ]
+}

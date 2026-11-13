@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/test-case-import" },
+    { "path": "packages/automation-core" },
+    { "path": "packages/execution-engine" },
+    { "path": "packages/reporting" },
+    { "path": "packages/llm" },
+    { "path": "packages/knowledge" },
+    { "path": "packages/agents" },
+    { "path": "services/qa-api" },
+    { "path": "services/qa-mcp" },
+    { "path": "services/qa-voice" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "outDir": "dist", "rootDir": "src" },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/test-case-import" },
+    { "path": "../../packages/automation-core" },
+    { "path": "../../packages/execution-engine" },
+    { "path": "../../packages/reporting" },
+    { "path": "../../packages/llm" },
+    { "path": "../../packages/knowledge" },
+    { "path": "../../packages/agents" }
+  ]
+}
