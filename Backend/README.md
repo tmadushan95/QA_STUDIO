@@ -74,7 +74,7 @@ Or F5 on **QaStudio.AppHost** in Visual Studio. It starts:
 | `worker-watch` | `tsc -b --watch`                                                  | Recompiles changed packages                                  |
 | `worker`       | `node --watch services/qa-api/dist/server.js` on `WorkerPort` (4000) | Restarts on new output (cancels runs in progress)          |
 | `voice`        | The voice agent, only when `QaStudio:Voice` is `true`             | As the worker                                                |
-| `frontend`     | `npm run dev` (Vite) on `FrontendPort` (5173)                     | Vite HMR                                                     |
+| `frontend`     | `npm run dev` (Vite) on `FrontendPort` (5173), once the worker is healthy | Vite HMR                                             |
 | `sql`          | A SQL Server container, only when `QaStudio:SqlContainer` is `true` (needs Docker; migrated on start) |               |
 
 The dashboard (http://localhost:15080) shows state, console logs, health and **traces across the API and the worker**. The

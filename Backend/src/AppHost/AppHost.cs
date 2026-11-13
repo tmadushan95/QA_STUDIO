@@ -90,7 +90,9 @@ if (options.GetValue("Frontend", true))
         .WithNpm(install: false)
         .WithHttpEndpoint(port: frontendPort, env: "PORT", isProxied: false)
         .WithEnvironment("QA_API_URL", apiUrl)
-        .WaitFor(api);
+        // Wait for the worker, not only the API: many pages call worker routes on load, and before the worker answers
+        // the gateway replies 503 "worker-unavailable". The worker itself waits for the API, so this covers both.
+        .WaitFor(worker);
 }
 
 await builder.Build().RunAsync().ConfigureAwait(false);
