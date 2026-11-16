@@ -14,6 +14,8 @@ export type TestCase = TestCaseDocument & {
   /** The project version the case was written for, when one was chosen. */
   projectVersionId?: number;
   projectVersionName?: string;
+  /** The saved version the case was read at; an update sends it back so it never overwrites a newer save. */
+  rowVersion?: string;
 };
 
 /** One runnable step: an action and its parameters. */
@@ -121,6 +123,13 @@ export const deleteCases = (ids: string[]) =>
 export const moveCases = (ids: string[], testSuiteId: number) =>
   send<{ moved: number; notFound: number }>('/api/test-cases/move', { ids, testSuiteId });
 
+/**
+ * Save a new order for test cases. The listed cases swap the places they already hold, so sending a filtered list
+ * leaves the cases it hides where they are. Lists and runs follow the saved order.
+ */
+export const reorderCases = (ids: string[]) =>
+  send<{ reordered: number; notFound: number }>('/api/test-cases/reorder', { ids });
+
 /** What the new test case form sends. */
 export interface NewCase {
   /** Leave out to let the server take the next free ID when it creates the case. */
@@ -138,6 +147,38 @@ export interface NewCase {
 
 /** Add a test case to a test suite. */
 export const createCase = (c: NewCase) => send<TestCase>('/api/test-cases', c);
+
+/** What the edit form sends: the written case as a whole, with each step's expected result. */
+export interface CaseChanges {
+  testSuiteId: number;
+  title: string;
+  // Empty fields are sent as undefined, which JSON leaves out: the server then clears them.
+  module: string | undefined;
+  priority: string | undefined;
+  preconditions: string | undefined;
+  expectedResult: string | undefined;
+  writtenSteps: { action: string; expected: string | undefined }[];
+  /** The version the form opened; a newer save in the meantime makes the server refuse (409). */
+  rowVersion: string | undefined;
+}
+
+/**
+ * Save changes to a written test case. Fields the form does not show (description, severity, tags, role) are sent
+ * back as they were, because the server replaces the written content as a whole.
+ */
+export const updateCase = (tc: TestCase, changes: CaseChanges) =>
+  send<TestCase>(
+    `/api/test-cases/${seg(tc.id)}`,
+    {
+      description: tc.description,
+      severity: tc.severity,
+      testType: tc.testType,
+      userRole: tc.userRole,
+      tags: tc.tags,
+      ...changes,
+    },
+    'PUT',
+  );
 
 /** The ID the next new case would get, following the existing pattern (e.g. TC_31 after TC_30). */
 export const fetchNextCaseId = () => get<{ id: string }>('/api/test-cases/next-id');

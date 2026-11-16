@@ -543,6 +543,7 @@ export class PlaywrightExecutor implements CaseExecutor {
             {
               index: 0,
               action: 'auth.sign-in',
+              description: 'Sign in',
               status: 'failed',
               durationMs: Date.now() - started,
               failure: { kind: 'blocked', message: reason },
@@ -555,6 +556,7 @@ export class PlaywrightExecutor implements CaseExecutor {
         steps.push({
           index: 0,
           action: 'auth.sign-in',
+          description: 'Sign in',
           status: 'passed',
           durationMs: Date.now() - started,
         });

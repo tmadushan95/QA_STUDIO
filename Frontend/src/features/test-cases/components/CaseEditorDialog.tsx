@@ -6,9 +6,10 @@
  * footer whose note says the one next thing to do. Wide screens show readiness and the case's facts in a side rail;
  * phones show the popup as a full-screen sheet with readiness as a row of chips above the tabs.
  *
- * - Steps: the visual step editor. Valid steps run from the next run on; steps with problems are kept as a draft and the
+ * - Steps: the visual step editor, with "Improve with AI" to ask for changes and compare before using them. Valid steps
+ *   run from the next run on; steps with problems are kept as a draft and the
  *   last valid version keeps running. If someone else saved in the meantime the save is refused, so no change is lost.
- * - Details: the case as written (steps, expected result, source workbook).
+ * - Details: the case as written (steps, expected result, source workbook), with Edit to change it.
  * - Parameters: the values the steps read as {{data.name}}, per case or common to the project.
  * - Runs: this case's latest results. History: earlier versions, with Restore.
  */
@@ -31,9 +32,12 @@ import { useCatalog } from '../../../shared/api/catalog.js';
 import { ApiError, errorMessage } from '../../../shared/api/http.js';
 import { useDebounced } from '../../../shared/hooks/useAsync.js';
 import { formatDate } from '../../../shared/lib/format.js';
+import { CaseDetailsForm } from './CaseDetailsForm.js';
 import { ParametersPanel } from './ParametersPanel.js';
+import { ReviseWithAi } from './ReviseWithAi.js';
 import { StartRunDialog } from '../../runs/components/StartRunDialog.js';
 import { fetchRuns, type RunView } from '../../runs/api.js';
+import { fetchDraftJob } from '../../ai-assistant/api.js';
 import {
   approveDraft,
   dataNamesIn,
@@ -73,6 +77,10 @@ export interface CaseEditorDialogProps {
   testCase: TestCase;
   /** The tab to open on, such as "history" from a list's History action. */
   initialTab?: 'steps' | 'details' | 'data' | 'runs' | 'history';
+  /** Open the Details tab ready to edit, as the list's "Edit test case" action does. */
+  editDetails?: boolean;
+  /** An AI job writing this case's steps: the Steps tab says so, then shows the steps when it is done. */
+  aiJobId?: string | undefined;
   onClose: () => void;
   /** Called after anything was saved, so the list refreshes. */
   onChanged: () => void;
@@ -89,12 +97,17 @@ export function CaseEditorDialog({
   onClose,
   onChanged,
   initialTab,
+  editDetails,
+  aiJobId,
 }: CaseEditorDialogProps) {
-  const tc = testCase;
+  // Kept here so a saved edit shows at once (title in the header, details), before the list reloads.
+  const [tc, setTc] = useState(testCase);
+  const [editingDetails, setEditingDetails] = useState(editDetails === true);
+  const [detailsDirty, setDetailsDirty] = useState(false);
   const toast = useToast();
   // The steps this case's project may use (standard ones, and the ones the project defined) and its pages.
   const catalog = useCatalog(tc.projectId ?? 0);
-  const [tab, setTab] = useState<TabId>(initialTab ?? 'steps');
+  const [tab, setTab] = useState<TabId>(editDetails ? 'details' : (initialTab ?? 'steps'));
   const [detail, setDetail] = useState<ScenarioDetail>();
   const [loadError, setLoadError] = useState('');
   const [steps, setSteps] = useState<Step[]>([]);
@@ -109,6 +122,9 @@ export function CaseEditorDialog({
   /** Saved parameter values of this case, so the footer and tab can say what is missing. */
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramState, setParamState] = useState<ParamState>('loading');
+  const [aiWriting, setAiWriting] = useState(Boolean(aiJobId));
+  /** Why the AI wrote no usable steps, when it could not. */
+  const [aiProblem, setAiProblem] = useState('');
 
   const load = async () => {
     try {
@@ -134,6 +150,34 @@ export function CaseEditorDialog({
     );
     // Load once per opened case.
   }, [tc.id]);
+
+  // Follow the AI job until it ends, then load the steps it wrote (a draft), ready to review and change.
+  useEffect(() => {
+    if (!aiJobId) return;
+    let stopped = false;
+    const check = async () => {
+      const job = await fetchDraftJob(aiJobId).catch(() => undefined);
+      if (stopped || !job || job.status === 'running') return;
+      stopped = true;
+      clearInterval(timer);
+      const result = job.results.find((r) => r.caseId === tc.id);
+      setAiProblem(
+        result?.outcome === 'drafted' || result?.outcome === 'needs-fixing'
+          ? ''
+          : (result?.message ?? job.stoppedBecause ?? 'The AI did not write steps for this case.'),
+      );
+      await load();
+      setAiWriting(false);
+      onChanged();
+    };
+    const timer = setInterval(() => void check(), 1500);
+    void check();
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+    // Follow the job this dialog was opened for, once.
+  }, [aiJobId]);
 
   const dirty = JSON.stringify(steps) !== baseline;
 
@@ -266,6 +310,13 @@ export function CaseEditorDialog({
             ? { tone: 'warn', text: `Parameter missing: ${missing.join(', ')}` }
             : { tone: 'ok', text: dirty ? 'All steps are valid · unsaved' : 'All steps are valid' };
 
+  const aiWritingNote = (
+    <p className={styles.loading} role="status">
+      <Spinner /> The AI is writing the steps for {tc.id}. The case is locked until it is done; then
+      the steps open here so you can check them and ask for changes.
+    </p>
+  );
+
   const status = current ? (
     <StatusBadge
       status={current.status}
@@ -300,7 +351,7 @@ export function CaseEditorDialog({
         }
         size="lg"
         expanded={expanded}
-        dirty={dirty}
+        dirty={dirty || detailsDirty}
         onClose={onClose}
         onSave={() => dirty && !saving && void save(false)}
         headerActions={
@@ -309,7 +360,7 @@ export function CaseEditorDialog({
               size="sm"
               icon="play"
               onClick={() => setRunning(true)}
-              disabled={dirty || !detail?.approved}
+              disabled={dirty || !detail?.approved || aiWriting}
             >
               Run
             </Button>
@@ -421,6 +472,8 @@ export function CaseEditorDialog({
                     <Alert tone="danger" title="The steps could not be loaded">
                       {loadError}
                     </Alert>
+                  ) : aiWriting ? (
+                    aiWritingNote
                   ) : !detail || !catalog ? (
                     <p className={styles.loading}>
                       <Spinner /> Loading steps…
@@ -442,6 +495,11 @@ export function CaseEditorDialog({
                         </Alert>
                       )}
                       {saveError && !conflict && <Alert tone="danger">{saveError}</Alert>}
+                      {aiProblem && (
+                        <Alert tone="warning" title="The AI could not write these steps">
+                          {aiProblem}
+                        </Alert>
+                      )}
                       {pendingDraft && (
                         <Alert
                           tone={pendingDraft.status === 'validated' ? 'info' : 'warning'}
@@ -453,6 +511,17 @@ export function CaseEditorDialog({
                         </Alert>
                       )}
                       <StepGuide defaultOpen={steps.length === 0} />
+                      <ReviseWithAi
+                        caseId={tc.id}
+                        steps={steps}
+                        actions={catalog.actions}
+                        onAccept={(next) => {
+                          setSteps(next);
+                          toast.show('The AI steps are in the editor. Check them, then Save.', {
+                            tone: 'info',
+                          });
+                        }}
+                      />
                       <StepEditor
                         steps={steps}
                         onChange={setSteps}
@@ -464,8 +533,31 @@ export function CaseEditorDialog({
                       />
                     </div>
                   ))}
-                {tab === 'details' && <CaseDetails tc={tc} />}
-                {tab === 'data' && (
+                {/* While the AI writes, the case is held still: only its runs can be looked at. */}
+                {aiWriting &&
+                  (tab === 'details' || tab === 'data' || tab === 'history') &&
+                  aiWritingNote}
+                {tab === 'details' &&
+                  !aiWriting &&
+                  (editingDetails ? (
+                    <CaseDetailsForm
+                      tc={tc}
+                      onDirtyChange={setDetailsDirty}
+                      onCancel={() => {
+                        setDetailsDirty(false);
+                        setEditingDetails(false);
+                      }}
+                      onSaved={(saved) => {
+                        setTc({ ...tc, ...saved });
+                        setEditingDetails(false);
+                        onChanged();
+                        toast.show(`Saved the changes to ${saved.id}.`, { tone: 'success' });
+                      }}
+                    />
+                  ) : (
+                    <CaseDetails tc={tc} onEdit={() => setEditingDetails(true)} />
+                  ))}
+                {tab === 'data' && !aiWriting && (
                   <ParametersPanel
                     caseId={tc.id}
                     stepNames={usedNames}
@@ -477,7 +569,7 @@ export function CaseEditorDialog({
                   />
                 )}
                 {tab === 'runs' && <CaseRuns caseId={tc.id} />}
-                {tab === 'history' && (
+                {tab === 'history' && !aiWriting && (
                   <CaseHistory
                     caseId={tc.id}
                     current={detail?.approved}
@@ -525,8 +617,8 @@ function draftTitle(d: ScenarioRecord): string {
     : `Draft v${d.version} written by ${who}: needs fixing`;
 }
 
-/** The case as written in the workbook. */
-function CaseDetails({ tc }: { tc: TestCase }) {
+/** The case as written, with the button that opens it for editing. */
+function CaseDetails({ tc, onEdit }: { tc: TestCase; onEdit: () => void }) {
   const rows: [string, string | undefined][] = [
     ['Module', tc.module],
     ['Priority', tc.priority],
@@ -536,6 +628,12 @@ function CaseDetails({ tc }: { tc: TestCase }) {
   ];
   return (
     <div className={styles.stack}>
+      <div className={styles.detailsHead}>
+        <h3 className={styles.subhead}>{tc.title}</h3>
+        <Button size="sm" icon="design" onClick={onEdit}>
+          Edit test case
+        </Button>
+      </div>
       <dl className={styles.details}>
         {rows
           .filter(([, v]) => v)
@@ -549,7 +647,7 @@ function CaseDetails({ tc }: { tc: TestCase }) {
       <div>
         <h3 className={styles.subhead}>Written steps</h3>
         {tc.steps.length === 0 ? (
-          <p className={styles.muted}>The workbook gave no steps.</p>
+          <p className={styles.muted}>No written steps yet. Use Edit test case to add them.</p>
         ) : (
           <ol className={styles.written}>
             {tc.steps.map((s) => (

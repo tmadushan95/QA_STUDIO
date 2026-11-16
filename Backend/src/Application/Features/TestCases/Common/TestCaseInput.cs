@@ -40,6 +40,15 @@ public record TestCaseInput
     /// <summary>Written steps, one action per entry. Left out on an update, the existing steps are kept.</summary>
     public IReadOnlyList<string>? Steps { get; init; }
 
+    /// <summary>
+    /// Written steps with each step's expected result, for an editor that shows both. Takes the place of
+    /// <see cref="Steps"/> when given, so a form that only knows actions keeps working.
+    /// </summary>
+    public IReadOnlyList<WrittenStepInput>? WrittenSteps { get; init; }
+
+    /// <summary>Whether the request says what the steps are (on an update, left out means keep them).</summary>
+    internal bool HasSteps => WrittenSteps is not null || Steps is not null;
+
     /// <summary>Tags.</summary>
     public IReadOnlyList<string>? Tags { get; init; }
 
@@ -69,5 +78,12 @@ public record TestCaseInput
     /// <summary>Builds the domain steps.</summary>
     /// <returns>The steps, numbered from 1.</returns>
     internal IEnumerable<TestCaseStep> ToSteps() =>
-        (Steps ?? []).Select((action, index) => new TestCaseStep(index + 1, Text.OrEmpty(action), null));
+        WrittenSteps is not null
+            ? WrittenSteps.Select((step, index) => new TestCaseStep(index + 1, Text.OrEmpty(step.Action), Text.OrNull(step.Expected)))
+            : (Steps ?? []).Select((action, index) => new TestCaseStep(index + 1, Text.OrEmpty(action), null));
 }
+
+/// <summary>One written step as an editor sends it.</summary>
+/// <param name="Action">What to do.</param>
+/// <param name="Expected">What should happen, when the step says.</param>
+public sealed record WrittenStepInput(string? Action, string? Expected);

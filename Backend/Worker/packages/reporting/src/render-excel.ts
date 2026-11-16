@@ -117,6 +117,8 @@ export async function renderExcel(r: RunReport): Promise<Buffer> {
     'Failure kind',
     'Failure message',
     'Account',
+    // Last, so columns that existing sheets and macros read by position do not move.
+    'Description',
   ]);
   for (const c of r.cases) {
     for (const st of c.steps)
@@ -129,6 +131,7 @@ export async function renderExcel(r: RunReport): Promise<Buffer> {
         st.failure?.kind ?? '',
         safeCell(st.failure?.message ?? ''),
         safeCell(c.account ?? ''),
+        safeCell(st.description ?? ''),
       ]);
   }
 

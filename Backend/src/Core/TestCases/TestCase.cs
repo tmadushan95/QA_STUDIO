@@ -33,6 +33,12 @@ public sealed class TestCase : AuditableEntity<long>
     /// <summary>The owning suite's key.</summary>
     public int TestSuiteId { get; private set; }
 
+    /// <summary>
+    /// Where the case sits in the lists and in a run, set once someone reorders it. Until then the case sorts by
+    /// <see cref="Entity{TId}.Id"/>, so new cases (from any source) land at the end with no extra write.
+    /// </summary>
+    public long? SortOrder { get; private set; }
+
     /// <summary>The owning suite.</summary>
     public TestSuite TestSuite { get; private set; } = null!;
 
@@ -175,6 +181,15 @@ public sealed class TestCase : AuditableEntity<long>
     {
         new DomainRules().That(FieldNames.TestSuiteId, testSuiteId > 0, TestSuiteErrors.ChooseSuiteMessage).ThrowIfBroken();
         TestSuiteId = testSuiteId;
+        Touch(utcNow);
+    }
+
+    /// <summary>Puts the case at a new place in the list order.</summary>
+    /// <param name="sortOrder">The new sort key.</param>
+    /// <param name="utcNow">The current UTC time.</param>
+    public void Reorder(long sortOrder, DateTime utcNow)
+    {
+        SortOrder = sortOrder;
         Touch(utcNow);
     }
 

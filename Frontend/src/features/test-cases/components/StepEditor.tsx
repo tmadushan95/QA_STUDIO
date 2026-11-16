@@ -533,6 +533,27 @@ function SentenceValue({
   );
 }
 
+/**
+ * A step in plain words as text, for places that list steps without editing them, such as an AI proposal shown next
+ * to the current steps. An action the catalog does not know shows by its name.
+ */
+export function stepSentence(info: ActionInfo | undefined, step: Step): string {
+  if (!info) return step.action;
+  const parts = sentenceParts(info, step.params);
+  return parts
+    .map((p, i) => {
+      if (typeof p === 'string') return p;
+      if (p.field?.kind === 'target') return describeElement(p.value as Target | undefined);
+      if (p.value === undefined || p.value === '') return '…';
+      if (typeof p.value === 'object') return JSON.stringify(p.value);
+      // A summary such as 'Check “{text}” is shown' already quotes the value.
+      const before = parts[i - 1];
+      const quoted = typeof before === 'string' && before.endsWith('“');
+      return quoted ? String(p.value) : `“${String(p.value)}”`;
+    })
+    .join('');
+}
+
 /** A piece of a step's sentence: words, or one of the step's values. */
 type SentencePart = string | { field: ActionField | undefined; value: unknown };
 

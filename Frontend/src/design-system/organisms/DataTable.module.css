@@ -85,6 +85,30 @@
 .selected {
   background: var(--color-primary-soft) !important;
 }
+/* Row reordering: a grab handle, the dragged row dimmed, and a line where it will land. */
+.handleCell {
+  padding-right: 0 !important;
+}
+.handle {
+  display: inline-flex;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: grab;
+}
+.handle:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+.handle:active {
+  cursor: grabbing;
+}
+.dragging {
+  opacity: 0.5;
+}
+.dropTarget > * {
+  box-shadow: inset 0 2px 0 var(--color-primary);
+}
 .shrink {
   width: 1%;
   white-space: nowrap;

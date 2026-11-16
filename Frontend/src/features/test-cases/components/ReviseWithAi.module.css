@@ -1,0 +1,68 @@
+/* ReviseWithAi: the "Improve with AI" box of the Steps tab. */
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-subtle);
+}
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.proposal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.compare {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  font-size: var(--text-sm);
+}
+.compare th,
+.compare td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+.compare thead th {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+}
+.compare tbody th {
+  width: 2.5rem;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+}
+.compare td {
+  width: 50%;
+  overflow-wrap: anywhere;
+}
+/* Changes are marked with a word badge too, so colour is never the only signal. */
+.compare tr[data-change='changed'] td:last-child,
+.compare tr[data-change='added'] td:last-child {
+  background: var(--color-info-soft);
+}
+.compare tr[data-change='removed'] td:first-child {
+  background: var(--color-danger-soft);
+  text-decoration: line-through;
+}
+.badge {
+  margin-left: var(--space-2);
+}
+.none {
+  color: var(--color-text-muted);
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

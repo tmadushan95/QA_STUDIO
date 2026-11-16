@@ -2,7 +2,7 @@
  * Requests of the AI assistant feature. Everything the AI produces is a proposal: drafts wait for approval in the
  * case editor and proposed test cases are previewed before they are added. Nothing AI writes runs by itself.
  */
-import { get, send } from '../../shared/api/http.js';
+import { get, send, seg } from '../../shared/api/http.js';
 
 /** A background job writing draft steps with AI. */
 export interface DraftJob {
@@ -14,6 +14,8 @@ export interface DraftJob {
   done: number;
   startedAt: string;
   endedAt?: string;
+  /** Every case the job writes steps for. Missing from an older worker. */
+  caseIds?: string[];
   results: {
     caseId: string;
     outcome: 'drafted' | 'needs-fixing' | 'unmappable' | 'failed' | 'skipped';
@@ -22,11 +24,27 @@ export interface DraftJob {
   stoppedBecause?: string;
 }
 
+/** What a proposed case checks, in the order the generator goes through them (mirrors the worker's checklist). */
+export const CASE_CATEGORIES = {
+  functional: 'Functional',
+  negative: 'Negative',
+  permission: 'Permission',
+  validation: 'Validation',
+  boundary: 'Boundary',
+  ui: 'UI',
+  accessibility: 'Accessibility',
+  'error-handling': 'Error handling',
+} as const;
+export type CaseCategory = keyof typeof CASE_CATEGORIES;
+
 /** A test case AI suggested from a prompt, not yet added. */
 export interface ProposedCase {
   title: string;
   module?: string;
   priority?: 'High' | 'Medium' | 'Low';
+  category?: CaseCategory;
+  /** Only a person can judge the result (how something looks); saved as a manual-only case. */
+  manualCheck?: boolean;
   preconditions?: string;
   steps: string[];
   expectedResult: string;
@@ -68,6 +86,9 @@ export async function fetchDraftJobs(): Promise<DraftJob[]> {
 }
 
 /** Start drafting steps for these cases. Drafts always wait for a person to approve them. */
+/** One AI step-writing job, to follow it while it runs. */
+export const fetchDraftJob = (id: string) => get<DraftJob>(`/api/ai/jobs/${seg(id)}`);
+
 export const startDrafts = (caseIds: string[]) => send<DraftJob>('/api/ai/generate', { caseIds });
 
 /** Stop a drafting job. */
@@ -112,17 +133,22 @@ export interface ProposeResult {
 
 /**
  * Ask the AI for test cases. `projectId` lets it use that project's page names in the steps; `/skill-name` in the
- * prompt applies a saved skill. Nothing is saved.
+ * prompt applies a saved skill; `options` picks the coverage. Nothing is saved.
  */
-export async function proposeCases(prompt: string, projectId?: number): Promise<ProposeResult> {
+export async function proposeCases(
+  prompt: string,
+  projectId?: number,
+  options?: ProposeOptions,
+): Promise<ProposeResult> {
   const r = await send<{ cases?: ProposedCase[]; skills?: SkillUsage }>('/api/ai/cases/preview', {
     prompt,
     ...(projectId ? { projectId } : {}),
+    ...(options ? { options } : {}),
   });
   return { cases: Array.isArray(r?.cases) ? r.cases : [], skills: r?.skills ?? NO_SKILLS };
 }
 
-/** Optional tuning of a generation request (used by voice). Leaving it out keeps the standard behaviour. */
+/** Optional tuning of a generation request. Leaving it out keeps the standard behaviour. */
 export interface ProposeOptions {
   coverage?: 'smoke' | 'standard' | 'thorough';
   format?: 'steps' | 'gherkin';
@@ -190,3 +216,20 @@ export async function explore(paths: string[]): Promise<ExploreResult[]> {
   const r = await send<{ items?: ExploreResult[] }>('/api/ai/explore', { paths });
   return Array.isArray(r?.items) ? r.items : [];
 }
+
+/** Steps the AI proposes after a tester asked for a change. Nothing is saved until the tester saves them. */
+export interface RevisedSteps {
+  steps: { action: string; params: Record<string, unknown> }[];
+  /** What the AI based them on, its assumptions, and what needs parameters or a manual check. */
+  note: string;
+  /** Problems the AI could not fix; they show on the steps once accepted. */
+  issues: string[];
+  warnings: string[];
+}
+
+/** Ask AI to change a case's steps as described, for example "check the message inside the popup". */
+export const reviseSteps = (
+  caseId: string,
+  steps: { action: string; params: Record<string, unknown> }[],
+  instruction: string,
+) => send<RevisedSteps>('/api/ai/steps/revise', { caseId, steps, instruction });

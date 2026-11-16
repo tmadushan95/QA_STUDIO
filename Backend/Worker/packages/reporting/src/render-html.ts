@@ -21,7 +21,8 @@ export function renderHtml(r: RunReport): string {
       const steps = cs.steps
         .map(
           (s) =>
-            `<li><span class="st ${esc(s.status)}">${esc(s.status)}</span> <code>${esc(s.action)}</code> ${dur(s.durationMs)}${s.failure ? ` <em>${esc(s.failure.message)}</em>` : ''}</li>`,
+            // The sentence leads; the action name stays as a hover hint for whoever debugs the scenario.
+            `<li><span class="st ${esc(s.status)}">${esc(s.status)}</span> ${s.description ? `<span title="${esc(s.action)}">${esc(s.description)}</span>` : `<code>${esc(s.action)}</code>`} <span class="muted">${dur(s.durationMs)}</span>${s.failure ? ` <em>${esc(s.failure.message)}</em>` : ''}</li>`,
         )
         .join('');
       const f = cs.failure;

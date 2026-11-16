@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Unsaved AI proposals are no longer lost when you leave the page — 2026-11-16
+
+- **AI Assistant › Generate keeps your prompt and proposed cases** (with their ticks and edits) when you switch tabs or
+  go to another page, and after a reload. They come back when you open Generate again, until you save or discard them.
+  They are kept per project and per browser tab, never shared with other tabs.
+- **Closing the browser tab with unsaved proposals asks first** (the browser's own "Leave site?" question).
+
+### AI test cases cover the whole task, one check per case — 2026-11-16
+
+- **AI Assistant › Generate has a Coverage choice:** Smoke (1–3 cases), Standard, or Thorough (including UI and
+  accessibility). Until now the page always used Standard; only voice could pick another level.
+- **The AI goes through a checklist** (functional, negative, permission, validation, boundary, UI, accessibility, error
+  handling) and writes a separate case for each check that applies. For example, "delete a project" gives its own
+  permission case and its own Delete button look case, instead of folding them into the main case.
+- **Each proposed case shows its category,** and the bar above the cards lists what is covered and what is not (for
+  example "Permission 1 · Not covered: Boundary, Accessibility"), so a gap shows before saving.
+- **Cases only a person can judge** (colour, layout, icons) are marked **Check by eye** and saved as manual-only.
+- **Saved cases carry the category** as their test type (Permission, UI, …) and as a tag, so the case list can filter them.
+- **Thorough writes up to 20 cases** in two rounds of up to 10, half the checklist each, so each answer stays within the
+  answer-size limit in Settings › AI assistant. A thorough request therefore uses two model calls.
+
 ### Step setup a tester can read: steps as sentences, parameters as chips — 2026-11-16
 
 - **Test case popup opens full screen,** so every step, label and box shows in full. The header button still gives the

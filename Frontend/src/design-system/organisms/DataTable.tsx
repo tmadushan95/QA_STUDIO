@@ -2,8 +2,17 @@
  * DataTable organism: a list of records with optional row selection and paging.
  * On phones each row becomes a card: every cell shows its column name, so nothing scrolls sideways.
  */
-import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { Button } from '../atoms/Button.js';
+import { Icon } from '../atoms/Icon.js';
 import { Checkbox } from '../atoms/Inputs.js';
 import styles from './DataTable.module.css';
 
@@ -37,6 +46,11 @@ export interface DataTableProps<T> {
   };
   empty?: ReactNode;
   paging?: { page: number; pageSize: number; total: number; onPage: (page: number) => void };
+  /**
+   * Turns on a drag handle per row: dropping one row on another calls `onMove` with both keys. Dragging only works
+   * within the page shown, so pair it with a keyboard-reachable way to move rows (such as a row menu).
+   */
+  reorder?: { onMove: (fromKey: string, toKey: string) => void };
   /**
    * Keep the column headers visible while the page scrolls. The value is how far from the top of the window they
    * stop (a CSS length), so they sit just below whatever else sticks above them, such as a `StickyBar`.
@@ -93,8 +107,16 @@ export function DataTable<T>({
   empty,
   paging,
   stickyHeaderTop,
+  reorder,
 }: DataTableProps<T>) {
   const keys = rows.map(rowKey);
+  // The row being dragged and the row it is over, for the drop marker.
+  const [dragging, setDragging] = useState<string>();
+  const [over, setOver] = useState<string>();
+  const endDrag = () => {
+    setDragging(undefined);
+    setOver(undefined);
+  };
   const allOnPage = keys.length > 0 && keys.every((k) => selection?.selected.has(k));
   const toggleAll = () => {
     if (!selection) return;
@@ -131,6 +153,11 @@ export function DataTable<T>({
           <caption className="visually-hidden">{caption}</caption>
           <thead>
             <tr>
+              {reorder && (
+                <th scope="col" className={styles.shrink}>
+                  <span className="visually-hidden">Order</span>
+                </th>
+              )}
               {selection && (
                 <th scope="col" className={styles.shrink}>
                   <Checkbox
@@ -156,8 +183,52 @@ export function DataTable<T>({
           <tbody>
             {rows.map((r) => {
               const k = rowKey(r);
+              const rowClass = [
+                selection?.selected.has(k) && styles.selected,
+                dragging === k && styles.dragging,
+                over === k && dragging !== k && styles.dropTarget,
+              ]
+                .filter(Boolean)
+                .join(' ');
+              // Drop handlers only while one of this table's rows is dragged, so files or text dropped from
+              // elsewhere are left to the browser.
+              const dropProps = reorder &&
+                dragging !== undefined && {
+                  onDragOver: (e: DragEvent) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (over !== k) setOver(k);
+                  },
+                  onDrop: (e: DragEvent) => {
+                    e.preventDefault();
+                    if (dragging !== k) reorder.onMove(dragging, k);
+                    endDrag();
+                  },
+                };
               return (
-                <tr key={k} className={selection?.selected.has(k) ? styles.selected : undefined}>
+                <tr key={k} className={rowClass || undefined} {...dropProps}>
+                  {reorder && (
+                    <td className={`${styles.shrink} ${styles.handleCell}`}>
+                      {/* Pointer-only: keyboard and screen reader users move rows from the row menu. */}
+                      <span
+                        className={styles.handle}
+                        draggable
+                        aria-hidden="true"
+                        title="Drag to reorder"
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', k);
+                          // Show the whole row as the drag image, not just the handle.
+                          const row = e.currentTarget.closest('tr');
+                          if (row) e.dataTransfer.setDragImage(row, 16, 16);
+                          setDragging(k);
+                        }}
+                        onDragEnd={endDrag}
+                      >
+                        <Icon name="drag" size={16} />
+                      </span>
+                    </td>
+                  )}
                   {selection && (
                     <td className={styles.shrink}>
                       <Checkbox

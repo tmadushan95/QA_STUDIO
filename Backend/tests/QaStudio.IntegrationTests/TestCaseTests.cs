@@ -99,6 +99,36 @@ public class TestCaseTests(ApiFixture api)
     }
 
     [Fact]
+    public async Task A_reorder_is_saved_and_moves_only_the_listed_cases_among_their_places()
+    {
+        var (project, suite) = await NewSuiteAsync();
+        var a = await NewCaseAsync(suite.Id);
+        var b = await NewCaseAsync(suite.Id);
+        var c = await NewCaseAsync(suite.Id);
+        var d = await NewCaseAsync(suite.Id);
+        async Task<List<string>> OrderAsync() =>
+            [.. (await (await _client.GetAsync($"/api/test-cases?projectId={project.Id}")).ReadAsync<CasePageDto>()).Items.Select(x => x.Id)];
+
+        // A filtered list (a, c, d) is reversed: b, left out, keeps the second place.
+        var response = await _client.PostAsJsonAsync("/api/test-cases/reorder", new { ids = new[] { d.Id, c.Id, a.Id } });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([d.Id, b.Id, c.Id, a.Id], await OrderAsync());
+
+        // Pages follow the saved order, and a case added afterwards goes to the end.
+        var paged = await (await _client.GetAsync($"/api/test-cases?projectId={project.Id}&page=1&pageSize=1")).ReadAsync<CasePageDto>();
+        Assert.Equal(d.Id, Assert.Single(paged.Items).Id);
+        var e = await NewCaseAsync(suite.Id);
+        Assert.Equal([d.Id, b.Id, c.Id, a.Id, e.Id], await OrderAsync());
+    }
+
+    [Fact]
+    public async Task A_reorder_needs_at_least_one_case()
+    {
+        var response = await _client.PostAsJsonAsync("/api/test-cases/reorder", new { ids = Array.Empty<string>() });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task A_page_size_above_the_limit_is_capped()
     {
         var page = await (await _client.GetAsync("/api/test-cases?pageSize=100000")).ReadAsync<CasePageDto>();
@@ -128,6 +158,23 @@ public class TestCaseTests(ApiFixture api)
 
         var stale = await _client.PutAsJsonAsync($"/api/test-cases/{created.Id}", new { testSuiteId = target.Id, title = "Stale", rowVersion = created.RowVersion });
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_update_can_save_written_steps_with_their_expected_results()
+    {
+        var (_, suite) = await NewSuiteAsync();
+        var created = await NewCaseAsync(suite.Id);
+        var response = await _client.PutAsJsonAsync($"/api/test-cases/{created.Id}", new
+        {
+            testSuiteId = suite.Id,
+            title = "Title",
+            rowVersion = created.RowVersion,
+            writtenSteps = new[] { new { action = "Click Delete", expected = (string?)"The popup opens" }, new { action = "Click Cancel", expected = (string?)null } },
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.ReadAsync<CaseDto>();
+        Assert.Equal([new StepDto(1, "Click Delete", "The popup opens"), new StepDto(2, "Click Cancel", null)], updated.Steps);
     }
 
     [Fact]

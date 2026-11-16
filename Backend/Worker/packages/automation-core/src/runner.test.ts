@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createLogger, type Scenario } from '@qa-studio/shared';
-import { ActionRegistry, defineAction, runScenario, type ActionContext } from './index.js';
+import {
+  ActionRegistry,
+  defineAction,
+  describeStep,
+  registerGenericActions,
+  runScenario,
+  type ActionContext,
+} from './index.js';
 
 const calls: string[] = [];
 const ac = new AbortController();
@@ -106,5 +113,49 @@ describe('runScenario (no browser)', () => {
     });
     expect(out.status).toBe('cancelled');
     expect(out.steps.map((s) => s.status)).toEqual(['passed', 'cancelled']);
+  });
+});
+
+describe('describeStep', () => {
+  const generic = registerGenericActions(new ActionRegistry());
+
+  it('fills the editor summary with the step values, targets in words', () => {
+    const click = { target: { role: 'button', name: 'Delete', exact: true } };
+    expect(describeStep(generic.get('click'), 'click', click)).toBe('Click button "Delete"');
+    expect(describeStep(generic.get('open'), 'open', { path: '/projects/draft-list' })).toBe(
+      'Open /projects/draft-list',
+    );
+  });
+
+  it('keeps data placeholders as written, so test data never reaches the report', () => {
+    const fill = { target: { label: 'Password' }, value: '{{data.password}}' };
+    expect(describeStep(generic.get('fill'), 'fill', fill)).toBe(
+      'Fill field "Password" with {{data.password}}',
+    );
+  });
+
+  it('lists the values after a summary without placeholders, and names unknown actions', () => {
+    const custom = defineAction({
+      name: 'custom.1.open',
+      description: '',
+      source: 'example',
+      params: z.object({ projectCode: z.string() }),
+      ui: {
+        label: 'Open draft project',
+        group: 'Custom',
+        summary: 'Open draft project',
+        fields: [{ name: 'projectCode', label: 'Project code', kind: 'text', required: true }],
+      },
+      run: async () => undefined,
+    });
+    expect(describeStep(custom, 'custom.1.open', { projectCode: 'PRJ-1' })).toBe(
+      'Open draft project (Project code: PRJ-1)',
+    );
+    expect(describeStep(undefined, 'drafts.open-project', {})).toBe('Drafts: open project');
+  });
+
+  it('puts the description on every step result', async () => {
+    const out = await runScenario(registry, sc('ok'), ctx(), { stepTimeoutMs: 100 });
+    expect(out.steps[0]?.description).toBe('Ok');
   });
 });

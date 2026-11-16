@@ -19,6 +19,8 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/');
   // The work context (project and version) is remembered per browser; every test starts without one.
   window.localStorage.clear();
+  // So are unsaved AI proposals, per browser tab.
+  window.sessionStorage.clear();
 });
 afterEach(() => {
   cleanup();
@@ -712,6 +714,45 @@ describe('a run in progress', () => {
     expect(within(cases).getAllByRole('listitem')).toHaveLength(1);
     expect(within(cases).getByText('TC_2')).toBeInTheDocument();
   });
+
+  it('shows each step as a sentence, and the action name for runs saved before sentences existed', async () => {
+    const at = '2026-01-01T00:00:00Z';
+    fakeServer({
+      'GET /api/runs/r8': () => ({
+        id: 'r8',
+        status: 'passed',
+        createdAt: at,
+        environment: 'qa',
+        browser: 'chromium',
+        workers: 1,
+        cases: [
+          {
+            caseId: 'TC_1',
+            status: 'passed',
+            startedAt: at,
+            steps: [
+              {
+                index: 0,
+                action: 'click',
+                description: 'Click button "Delete"',
+                status: 'passed',
+                durationMs: 5,
+              },
+              { index: 1, action: 'wait-for', status: 'passed', durationMs: 5 },
+            ],
+            artifacts: [],
+          },
+        ],
+        summary: { total: 1, counts: { passed: 1 }, passRate: 1 },
+      }),
+    });
+    go(`${HOME}/run-history/r8`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /TC_1/ }));
+    expect(screen.getByText('Click button "Delete"')).toHaveAttribute('title', 'click');
+    expect(screen.getByText('wait-for').tagName).toBe('CODE');
+  });
 });
 
 describe('the step editor', () => {
@@ -844,6 +885,165 @@ describe('the step editor', () => {
       values: { project: 'QA-1', role: 'Admin' },
     });
   });
+
+  it('asks AI for changed steps, shows them next to the current ones, and saves only when told', async () => {
+    const server = fakeServer({
+      'POST /api/ai/steps/revise': (b) => ({
+        steps: [
+          ...(b as { steps: unknown[] }).steps,
+          { action: 'assert-text', params: { text: 'Are you sure?' } },
+        ],
+        note: 'Based on the action catalog.',
+        issues: [],
+        warnings: [],
+      }),
+      'PUT /api/scenarios/TC_1': () => ({
+        caseId: 'TC_1',
+        scenario: { steps: [] },
+        status: 'approved',
+        origin: 'manual',
+        version: 2,
+        updatedAt: '2026-01-02T00:00:00Z',
+        issues: [],
+        warnings: [],
+      }),
+    });
+    const { user, dialog } = await open();
+    const ask = await within(dialog).findByRole('textbox', { name: 'Improve with AI' });
+    await user.type(ask, 'Check the message in the popup');
+    await user.click(within(dialog).getByRole('button', { name: 'Ask AI' }));
+    const compare = await within(dialog).findByRole('table', {
+      name: "Your steps and the AI's steps",
+    });
+    expect(server.sent('POST', '/api/ai/steps/revise')[0]!.body).toMatchObject({
+      caseId: 'TC_1',
+      instruction: 'Check the message in the popup',
+    });
+    expect(within(compare).getByText('Check “Are you sure?” is shown')).toBeInTheDocument();
+    expect(within(compare).getByText('New')).toBeInTheDocument();
+    // Nothing is saved by asking.
+    expect(server.sent('PUT', '/api/scenarios/TC_1')).toHaveLength(0);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Use these steps' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save & close' }));
+    await waitFor(() => expect(server.sent('PUT', '/api/scenarios/TC_1')).toHaveLength(1));
+    expect(server.sent('PUT', '/api/scenarios/TC_1')[0]!.body).toMatchObject({
+      steps: [
+        { action: 'click', params: { target: { role: 'button', name: 'Delete' } } },
+        { action: 'assert-text', params: { text: 'Are you sure?' } },
+      ],
+    });
+  });
+});
+
+describe('editing a test case', () => {
+  it('edits the written case from the row menu and saves it with the version it opened', async () => {
+    const first = {
+      ...tcOf('TC_1', { steps: [{ order: 1, action: 'Click Delete', expected: 'A popup opens' }] }),
+      testSuiteId: 1,
+      rowVersion: 'v1',
+    };
+    const server = fakeServer({
+      'GET /api/test-cases': () => ({
+        total: 2,
+        page: 1,
+        pageSize: 200,
+        items: [first, tcOf('TC_2')],
+      }),
+      'PUT /api/test-cases/TC_1': (b) => ({ ...first, ...(b as object), rowVersion: 'v2' }),
+    });
+    go(`${HOME}/test-cases`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit test case' }));
+    const dialog = await screen.findByRole('dialog', { name: /TC_1/ });
+    const form = within(dialog).getByRole('form', { name: 'Edit test case' });
+    const title = within(form).getByLabelText(/Title/);
+    await user.clear(title);
+    await user.type(title, 'New title');
+    await user.click(within(form).getByRole('button', { name: 'Add step' }));
+    await user.type(within(form).getByLabelText('Written step 2: action'), 'Click Cancel');
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(server.sent('PUT', '/api/test-cases/TC_1')).toHaveLength(1));
+    expect(server.sent('PUT', '/api/test-cases/TC_1')[0]!.body).toMatchObject({
+      testSuiteId: 1,
+      title: 'New title',
+      module: 'Projects',
+      priority: 'High',
+      rowVersion: 'v1',
+      writtenSteps: [
+        { action: 'Click Delete', expected: 'A popup opens' },
+        { action: 'Click Cancel' },
+      ],
+    });
+    // Back to reading, with the saved title.
+    expect(
+      await within(dialog).findByRole('button', { name: 'Edit test case' }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getAllByText('New title').length).toBeGreaterThan(0);
+  });
+
+  it('opens the case while the AI writes its steps, locked, and shows them for review when done', async () => {
+    let started = false;
+    let checks = 0;
+    const job = (status: string) => ({
+      id: 'job7',
+      status,
+      provider: 'fake',
+      model: 'm',
+      total: 1,
+      done: status === 'done' ? 1 : 0,
+      startedAt: '2026-01-01T00:00:00Z',
+      caseIds: ['TC_2'],
+      results: status === 'done' ? [{ caseId: 'TC_2', outcome: 'drafted' }] : [],
+    });
+    const server = fakeServer({
+      'POST /api/ai/generate': () => {
+        started = true;
+        return { id: 'job7' };
+      },
+      // Running on the first look, done on the next.
+      'GET /api/ai/jobs/job7': () => job(++checks > 1 ? 'done' : 'running'),
+      'GET /api/ai/jobs': () => ({
+        items: started ? [job(checks > 1 ? 'done' : 'running')] : [],
+      }),
+      'GET /api/scenarios/TC_2': () => ({
+        draft: {
+          caseId: 'TC_2',
+          scenario: { steps: [{ action: 'assert-text', params: { text: 'Saved' } }] },
+          status: 'validated',
+          origin: 'ai',
+          version: 1,
+          updatedAt: '2026-01-01T00:00:00Z',
+          issues: [],
+          warnings: [],
+        },
+      }),
+    });
+    go(`${HOME}/test-cases`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_2' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Write steps with AI' }));
+    const dialog = await screen.findByRole('dialog', { name: /TC_2/ });
+    expect(server.sent('POST', '/api/ai/generate')[0]!.body).toEqual({ caseIds: ['TC_2'] });
+    expect(
+      await within(dialog).findByText(/The AI is writing the steps for TC_2/),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Run' })).toBeDisabled();
+    // The list holds the case still too, instead of repeating the progress line.
+    const row = screen.getByRole('rowheader', { name: 'TC_2' }).closest('tr')!;
+    expect(within(row).getByText('AI writing')).toBeInTheDocument();
+    expect(screen.queryByText(/The AI is writing steps: /)).not.toBeInTheDocument();
+
+    // When the AI is done, its steps open for review, with the box to ask for changes.
+    expect(
+      await within(dialog).findByText(/Draft v1 written by AI/, {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('textbox', { name: 'Improve with AI' })).toBeInTheDocument();
+  });
 });
 
 describe('test case studio', () => {
@@ -867,6 +1067,46 @@ describe('test case studio', () => {
     );
     await waitFor(() => expect(server.sent('POST', '/api/scenarios/approve')).toHaveLength(1));
     expect(server.sent('POST', '/api/scenarios/approve')[0]!.body).toEqual({ caseIds: ['TC_2'] });
+  });
+
+  it('reorders a case from its row menu and saves the list in its new order', async () => {
+    const server = fakeServer({
+      'POST /api/test-cases/reorder': () => ({ reordered: 2, notFound: 0 }),
+    });
+    go(`${HOME}/test-cases`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_2' }));
+    expect(screen.getByRole('menuitem', { name: 'Move down' })).toBeDisabled();
+    await user.click(screen.getByRole('menuitem', { name: 'Move up' }));
+    await waitFor(() => expect(server.sent('POST', '/api/test-cases/reorder')).toHaveLength(1));
+    expect(server.sent('POST', '/api/test-cases/reorder')[0]!.body).toEqual({
+      ids: ['TC_2', 'TC_1'],
+    });
+  });
+
+  it('moves a case to a numbered position, which reaches other pages', async () => {
+    const server = fakeServer({
+      'POST /api/test-cases/reorder': () => ({ reordered: 2, notFound: 0 }),
+    });
+    go(`${HOME}/test-cases`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move to position…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move TC_1' });
+    const position = within(dialog).getByRole('spinbutton', { name: /New position/ });
+    await user.clear(position);
+    await user.type(position, '3');
+    expect(within(dialog).getByText('Enter a number from 1 to 2.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Move' })).toBeDisabled();
+    await user.clear(position);
+    await user.type(position, '2');
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(server.sent('POST', '/api/test-cases/reorder')).toHaveLength(1));
+    expect(server.sent('POST', '/api/test-cases/reorder')[0]!.body).toEqual({
+      ids: ['TC_2', 'TC_1'],
+    });
   });
 
   it('shows ready cases from the status filter', async () => {
@@ -974,6 +1214,94 @@ describe('test case studio', () => {
     const saved = await screen.findByRole('region', { name: 'Saved test cases' });
     expect(await within(saved).findByText('Steps ready to review')).toBeInTheDocument();
     expect(within(saved).getByText('Check by hand: the email.')).toBeInTheDocument();
+  });
+
+  it('sends the chosen coverage and shows each proposal’s category and what is not covered', async () => {
+    const server = fakeServer({
+      'GET /api/ai': () => ({ provider: 'anthropic', ready: true }),
+      'POST /api/ai/cases/preview': () => ({
+        cases: [
+          {
+            title: 'Delete a draft',
+            category: 'functional',
+            steps: ['Click the Delete button'],
+            expectedResult: 'Gone',
+          },
+          {
+            title: 'Viewer cannot delete',
+            category: 'permission',
+            steps: ['Go to the Projects page'],
+            expectedResult: 'No Delete button',
+          },
+          {
+            title: 'Delete button looks dangerous',
+            category: 'ui',
+            manualCheck: true,
+            steps: ['Go to the Projects page'],
+            expectedResult: 'Red with a bin icon',
+          },
+        ],
+      }),
+    });
+    go(`${HOME}/ai-assistant`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.selectOptions(await screen.findByLabelText('Coverage'), 'thorough');
+    await user.type(
+      await screen.findByLabelText(/What should be tested/),
+      'Delete a draft project',
+    );
+    await user.click(screen.getByRole('button', { name: 'Generate test cases' }));
+    expect(await screen.findByDisplayValue('Viewer cannot delete')).toBeInTheDocument();
+    expect(server.sent('POST', '/api/ai/cases/preview')[0]!.body).toMatchObject({
+      options: { coverage: 'thorough' },
+    });
+    const results = screen.getByRole('region', { name: 'Proposed test cases' });
+    expect(within(results).getByText('Permission 1')).toBeInTheDocument();
+    expect(within(results).getByText('Check by eye')).toBeInTheDocument();
+    expect(
+      within(results).getByText(/Not covered: Negative, Validation, Boundary/),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps unsaved proposals when the page is left and opened again, until they are discarded', async () => {
+    fakeServer({
+      'GET /api/ai': () => ({ provider: 'anthropic', ready: true }),
+      'POST /api/ai/cases/preview': () => ({
+        cases: [
+          { title: 'Delete a draft', category: 'functional', steps: ['x'], expectedResult: 'Gone' },
+          { title: 'Viewer cannot delete', steps: ['y'], expectedResult: 'No button' },
+        ],
+      }),
+    });
+    go(`${HOME}/ai-assistant`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(
+      await screen.findByLabelText(/What should be tested/),
+      'Delete a draft project',
+    );
+    await user.click(screen.getByRole('button', { name: 'Generate test cases' }));
+    await user.click(await screen.findByRole('checkbox', { name: 'Keep "Viewer cannot delete"' }));
+
+    // Leaving the page unmounts the panel; opening it again brings back the prompt, the cards and the ticks.
+    cleanup();
+    go(`${HOME}/ai-assistant`);
+    render(<App />);
+    expect(await screen.findByDisplayValue('Viewer cannot delete')).toBeInTheDocument();
+    expect(screen.getByLabelText(/What should be tested/)).toHaveValue('Delete a draft project');
+    expect(screen.getByRole('checkbox', { name: 'Keep "Delete a draft"' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Keep "Viewer cannot delete"' })).not.toBeChecked();
+
+    // Discard forgets them for good: the prompt stays to try again, the cards do not come back.
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    cleanup();
+    go(`${HOME}/ai-assistant`);
+    render(<App />);
+    expect(await screen.findByLabelText(/What should be tested/)).toHaveValue(
+      'Delete a draft project',
+    );
+    expect(screen.queryByRole('region', { name: 'Proposed test cases' })).not.toBeInTheDocument();
   });
 
   it('fills in the next ID for a new case and files it in the chosen version', async () => {

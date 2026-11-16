@@ -7,6 +7,8 @@ import {
   catalog,
   describeParams,
   generateScenario,
+  CASE_CATEGORIES,
+  MAX_PROPOSED_THOROUGH,
   proposeCases,
   proposeOrAsk,
   toTestCases,
@@ -323,7 +325,7 @@ describe('prompt to test cases', () => {
     await proposeCases({ gateway: gw(plain), prompt: 'Test deleting draft projects' });
     expect(plain.requests[0]!.system).not.toContain('ALSO:');
 
-    const tuned = new FakeLlm([answer]);
+    const tuned = new FakeLlm([answer, answer]);
     await proposeCases({
       gateway: gw(tuned),
       prompt: 'um test deleting draft projects',
@@ -332,10 +334,126 @@ describe('prompt to test cases', () => {
       spoken: true,
     });
     const system = tuned.requests[0]!.system ?? '';
-    expect(system).toContain('negative, boundary');
+    expect(system).toContain('ui and accessibility included');
     expect(system).toContain('Given, When, Then');
     expect(system).toContain('spoken and transcribed');
     expect(system).toContain('Never invent URLs, project codes');
+  });
+
+  it('goes through the coverage checklist, one check per case', async () => {
+    const plain = new FakeLlm([answer]);
+    await proposeCases({ gateway: gw(plain), prompt: 'Test deleting draft projects' });
+    const system = plain.requests[0]!.system ?? '';
+    expect(system).toContain('CHECKLIST');
+    for (const c of CASE_CATEGORIES) expect(system).toContain(`- ${c}:`);
+    expect(system).toContain('between 1 and 10 cases');
+    expect(system).toContain('"manualCheck": true');
+    expect(system).not.toContain('This round');
+    expect(plain.requests).toHaveLength(1);
+  });
+
+  it('writes thorough cases in two rounds of half the checklist, the second told what the first wrote', async () => {
+    const tenOf = (category: string, from: number) =>
+      Array.from({ length: 10 }, (_, i) => ({
+        title: `Case number ${from + i}`,
+        category,
+        steps: ['Click the Delete button'],
+        expectedResult: 'The project is gone',
+      }));
+    const fake = new FakeLlm([
+      JSON.stringify({ cases: tenOf('functional', 1) }),
+      JSON.stringify({ cases: tenOf('boundary', 11) }),
+    ]);
+    const cases = await proposeCases({
+      gateway: gw(fake),
+      prompt: 'Test deleting draft projects',
+      coverage: 'thorough',
+    });
+    expect(cases).toHaveLength(MAX_PROPOSED_THOROUGH);
+    expect(fake.requests).toHaveLength(2);
+    const [first, second] = fake.requests;
+    expect(first!.system).toContain(
+      'ONLY for these CHECKLIST items: functional, negative, permission, validation',
+    );
+    expect(first!.messages[0]!.content).not.toContain('<written>');
+    expect(second!.system).toContain(
+      'ONLY for these CHECKLIST items: boundary, ui, accessibility, error-handling',
+    );
+    expect(second!.messages[0]!.content).toContain('- Case number 1 (functional)');
+    // Each answer stays within the default answer-size limit.
+    expect(fake.requests.every((r) => r.maxTokens <= 4096)).toBe(true);
+  });
+
+  it('accepts a later thorough round where none of its checklist items apply', async () => {
+    const fake = new FakeLlm([answer, JSON.stringify({ cases: [] })]);
+    const cases = await proposeCases({
+      gateway: gw(fake),
+      prompt: 'Test deleting draft projects',
+      coverage: 'thorough',
+    });
+    expect(cases).toHaveLength(2);
+  });
+
+  it('keeps a valid category and manual check, and drops a made-up category instead of failing', async () => {
+    const fake = new FakeLlm([
+      JSON.stringify({
+        cases: [
+          {
+            title: 'Viewer cannot delete',
+            category: 'permission',
+            steps: ['Go to the Projects page'],
+            expectedResult: 'The Delete button is not displayed',
+          },
+          {
+            title: 'Delete button is red',
+            category: 'ui',
+            manualCheck: true,
+            steps: ['Go to the Projects page'],
+            expectedResult: 'The Delete button is red with a bin icon',
+          },
+          {
+            title: 'Something odd',
+            category: 'performance',
+            steps: ['Go to the Projects page'],
+            expectedResult: 'The page shows',
+          },
+        ],
+      }),
+    ]);
+    const cases = await proposeCases({ gateway: gw(fake), prompt: 'Test deleting draft projects' });
+    expect(cases.map((c) => c.category)).toEqual(['permission', 'ui', undefined]);
+    expect(cases[1]!.manualCheck).toBe(true);
+  });
+
+  it('files the category as the test type and a tag, and a manual check as a manual-only case', () => {
+    const [perm, ui] = toTestCases(
+      [
+        {
+          title: 'Viewer cannot delete',
+          category: 'permission',
+          steps: ['a'],
+          expectedResult: 'ok',
+        },
+        {
+          title: 'Delete button is red',
+          category: 'ui',
+          manualCheck: true,
+          steps: ['b'],
+          expectedResult: 'red',
+        },
+      ],
+      { existingIds: new Set() },
+    );
+    expect(perm).toMatchObject({
+      testType: 'Permission',
+      tags: ['ai-generated', 'permission'],
+      readiness: 'needs-clarification',
+    });
+    expect(ui).toMatchObject({
+      testType: 'UI',
+      tags: ['ai-generated', 'ui', 'manual-check'],
+      readiness: 'manual-only',
+    });
   });
 
   it('returns clarifying questions when the model asks, and cases when it does not', async () => {

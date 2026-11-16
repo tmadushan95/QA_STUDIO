@@ -220,7 +220,15 @@ describe('accounts in reports', () => {
         module: 'Projects',
         account: 'Approver',
         status: 'passed',
-        steps: [{ index: 0, action: 'auth.sign-in', status: 'passed', durationMs: 5 }],
+        steps: [
+          {
+            index: 0,
+            action: 'auth.sign-in',
+            description: 'Sign in',
+            status: 'passed',
+            durationMs: 5,
+          },
+        ],
         artifacts: [],
       },
       {
@@ -256,5 +264,14 @@ describe('accounts in reports', () => {
       'Requester <b>',
     ]);
     expect(wb.getWorksheet('Steps')!.getRow(2).getCell(8).value).toBe('Approver');
+  });
+
+  it('shows each step as a sentence, keeping the action name as a hint', async () => {
+    expect(renderHtml(r)).toContain('<span title="auth.sign-in">Sign in</span>');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await renderExcel(r)) as unknown as ExcelJS.Buffer);
+    const steps = wb.getWorksheet('Steps')!;
+    expect(steps.getRow(1).getCell(9).value).toBe('Description');
+    expect(steps.getRow(2).getCell(9).value).toBe('Sign in');
   });
 });

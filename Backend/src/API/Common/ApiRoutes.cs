@@ -69,6 +69,9 @@ internal static class ApiRoutes
     /// <summary>Moving test cases.</summary>
     public const string MoveTestCases = TestCases + "/move";
 
+    /// <summary>Reordering test cases.</summary>
+    public const string ReorderTestCases = TestCases + "/reorder";
+
     /// <summary>Giving test cases a project version.</summary>
     public const string AssignTestCasesVersion = TestCases + "/assign-version";
 

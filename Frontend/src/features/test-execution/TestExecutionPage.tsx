@@ -37,6 +37,7 @@ import { ParametersDialog } from '../test-cases/components/ParametersDialog.js';
 import { useProjectScope } from '../master-data/index.js';
 import { StatusFilter } from '../test-cases/components/StatusFilter.js';
 import { matches, useCaseLibrary, type CaseRow } from '../test-cases/useCaseLibrary.js';
+import { useCaseReorder } from '../test-cases/useCaseReorder.js';
 import list from '../test-cases/components/CaseList.module.css';
 import styles from './TestExecutionPage.module.css';
 
@@ -81,8 +82,10 @@ export function TestExecutionPage() {
     if (result === 'missing') return r.missing.length > 0;
     return true;
   });
-  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const ids = [...selected];
+  const order = useCaseReorder(rows, lib.rows, lib.reload);
+  const pageRows = order.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // In list order, not the order the boxes were ticked: a run takes its cases in the order it is given.
+  const ids = lib.rows.map((r) => r.tc.id).filter((id) => selected.has(id));
 
   const active = lib.runs.find((r) => ACTIVE.includes(r.status));
   const missingCount = ready.filter((r) => r.missing.length > 0).length;
@@ -148,6 +151,7 @@ export function TestExecutionPage() {
                 onSelect: () => setRunning({ ids: [r.tc.id], concurrent: true }),
               },
               { label: 'View steps', icon: 'design', onSelect: () => setEditing(r.tc) },
+              ...order.menuItems(r),
             ]}
           />
         </span>
@@ -328,6 +332,7 @@ export function TestExecutionPage() {
             rowKey={(r) => r.tc.id}
             selection={{ selected, onChange: setSelected, label: (r) => `Select ${r.tc.id}` }}
             paging={{ page, pageSize: PAGE_SIZE, total: rows.length, onPage: setPage }}
+            reorder={order.table}
             empty={
               lib.loading ? (
                 <EmptyState icon="refresh" title="Loading test cases…" />
@@ -351,6 +356,7 @@ export function TestExecutionPage() {
         </div>
       </div>
 
+      {order.dialog}
       {running && (
         <StartRunDialog
           caseIds={running.ids}

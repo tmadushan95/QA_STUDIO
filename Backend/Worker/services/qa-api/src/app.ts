@@ -996,6 +996,8 @@ export function createApp(
     cancelled: tasksOr404().cancel(req.params.id),
   }));
   app.post('/api/ai/diagnose', (req) => tasksOr404().diagnose(req.body));
+  // Proposes revised steps for review; nothing is saved until the tester saves them in the editor.
+  app.post('/api/ai/steps/revise', (req) => tasksOr404().reviseSteps(req.body));
   app.get('/api/ai/explore', () => ({ defaultPaths: DEFAULT_EXPLORE_PATHS, max: MAX_EXPLORE }));
   app.post('/api/ai/explore', async (req) => ({ items: await tasksOr404().explore(req.body) }));
   app.post('/api/ai/cases/preview', async (req) => {

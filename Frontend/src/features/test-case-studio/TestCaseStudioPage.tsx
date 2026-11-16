@@ -9,7 +9,7 @@
  * - A compact **toolbar** (search, suite, more filters) that sticks while the list scrolls and turns into the **bulk
  *   actions** bar when cases are selected, so the two never compete for space.
  * - A one-line **activity** strip while imported or generated cases are being turned into steps.
- * - The list. Every row has the same ⋯ menu: edit steps, parameters, history, write steps, set version, move, delete.
+ * - The list. Every row has the same ⋯ menu: edit test case, edit steps, parameters, history, write steps, set version, move, delete.
  */
 import { useMemo, useState } from 'react';
 import {
@@ -60,12 +60,13 @@ import { ParametersDialog } from '../test-cases/components/ParametersDialog.js';
 import { useProjectScope } from '../master-data/index.js';
 import { StatusFilter } from '../test-cases/components/StatusFilter.js';
 import { matches, useCaseLibrary, type CaseRow } from '../test-cases/useCaseLibrary.js';
+import { useCaseReorder } from '../test-cases/useCaseReorder.js';
 import list from '../test-cases/components/CaseList.module.css';
 import { CreateCasesDialog, type Destination } from './components/CreateCasesDialog.js';
 import styles from './TestCaseStudioPage.module.css';
 
 type StateFilter = 'all' | 'none' | 'draft' | 'validated' | 'approved';
-type EditorTab = 'steps' | 'history';
+type EditorTab = 'steps' | 'details' | 'history';
 
 const PAGE_SIZE = 25;
 /** The AI writes steps for at most this many cases per request (the server's limit). */
@@ -99,7 +100,8 @@ export function TestCaseStudioPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState('');
 
-  const [editing, setEditing] = useState<{ tc: TestCase; tab: EditorTab }>();
+  // `aiJobId`: the editor was opened to watch the AI write this case's steps.
+  const [editing, setEditing] = useState<{ tc: TestCase; tab: EditorTab; aiJobId?: string }>();
   const [params, setParams] = useState<TestCase>();
   const [creating, setCreating] = useState(false);
   const [importTarget, setImportTarget] = useState<FilingTarget>();
@@ -128,7 +130,8 @@ export function TestCaseStudioPage() {
       (!module || r.tc.module === module) &&
       (!onlyMissing || r.missing.length > 0),
   );
-  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const order = useCaseReorder(filtered, lib.rows, lib.reload);
+  const pageRows = order.rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const count = (s: StateFilter) =>
     s === 'all' ? scoped.length : scoped.filter((r) => r.state === s).length;
   const extraFilters = [priority, module, onlyMissing ? 'x' : ''].filter(Boolean).length;
@@ -136,7 +139,14 @@ export function TestCaseStudioPage() {
   const reset = () => setPage(1);
 
   const runningConversion = (conversions.data ?? []).find((j) => j.status === 'running');
-  const runningAi = (aiJobs.data ?? []).find((j) => j.status === 'running');
+  // A job the open editor is already showing is not repeated in the page's progress line.
+  const runningAi = (aiJobs.data ?? []).find(
+    (j) => j.status === 'running' && j.id !== editing?.aiJobId,
+  );
+  // Cases the AI is writing steps for are held still until it is done, so nothing races its draft.
+  const aiBusy = new Set(
+    (aiJobs.data ?? []).filter((j) => j.status === 'running').flatMap((j) => j.caseIds ?? []),
+  );
 
   const act = async (label: string, work: () => Promise<string>) => {
     setBusy(label);
@@ -162,6 +172,19 @@ export function TestCaseStudioPage() {
       await convertCases(list);
       return `Turning the written steps of ${plural(list.length, 'case')} into runnable steps.`;
     });
+  // One case: open its editor at once, where the steps appear when the AI is done, ready to review and change.
+  const writeOneWithAi = async (tc: TestCase) => {
+    setBusy('ai');
+    try {
+      const job = await draftWithAi([tc.id]);
+      setEditing({ tc, tab: 'steps', aiJobId: job.id });
+      aiJobs.reload();
+    } catch (e) {
+      toast.show(errorMessage(e), { tone: 'danger' });
+    } finally {
+      setBusy('');
+    }
+  };
   const writeWithAi = (list: string[]) =>
     act('ai', async () => {
       await draftWithAi(list.slice(0, MAX_AI));
@@ -181,6 +204,11 @@ export function TestCaseStudioPage() {
 
   const rowMenu = (r: CaseRow) => [
     {
+      label: 'Edit test case',
+      icon: 'cases' as const,
+      onSelect: () => setEditing({ tc: r.tc, tab: 'details' }),
+    },
+    {
       label: 'Edit steps',
       icon: 'design' as const,
       onSelect: () => setEditing({ tc: r.tc, tab: 'steps' }),
@@ -199,7 +227,7 @@ export function TestCaseStudioPage() {
     {
       label: 'Write steps with AI',
       icon: 'sparkle' as const,
-      onSelect: () => void writeWithAi([r.tc.id]),
+      onSelect: () => void writeOneWithAi(r.tc),
     },
     { label: 'Set version', icon: 'version' as const, onSelect: () => setVersioning([r.tc.id]) },
     {
@@ -207,6 +235,7 @@ export function TestCaseStudioPage() {
       icon: 'folder' as const,
       onSelect: () => setMoving([r.tc.id]),
     },
+    ...order.menuItems(r),
     {
       label: 'Delete',
       icon: 'trash' as const,
@@ -229,7 +258,12 @@ export function TestCaseStudioPage() {
       key: 'status',
       header: 'Automation',
       shrink: true,
-      cell: (r) => <StatusBadge status={r.state} />,
+      cell: (r) =>
+        aiBusy.has(r.tc.id) ? (
+          <StatusBadge status="running" label="AI writing" />
+        ) : (
+          <StatusBadge status={r.state} />
+        ),
     },
     {
       key: 'steps',
@@ -246,12 +280,19 @@ export function TestCaseStudioPage() {
       shrink: true,
       cell: (r) => (
         <span className={list.rowActions}>
-          {r.state === 'validated' && selected.size === 0 && (
+          {r.state === 'validated' && selected.size === 0 && !aiBusy.has(r.tc.id) && (
             <Button size="sm" icon="check" onClick={() => void markReady([r.tc.id])}>
               Mark ready
             </Button>
           )}
-          <Menu label={`Actions for ${r.tc.id}`} items={rowMenu(r)} />
+          <Menu
+            label={`Actions for ${r.tc.id}`}
+            items={
+              aiBusy.has(r.tc.id)
+                ? rowMenu(r).map((item) => ({ ...item, disabled: true }))
+                : rowMenu(r)
+            }
+          />
         </span>
       ),
     },
@@ -486,6 +527,7 @@ export function TestCaseStudioPage() {
           rowKey={(r) => r.tc.id}
           selection={{ selected, onChange: setSelected, label: (r) => `Select ${r.tc.id}` }}
           paging={{ page, pageSize: PAGE_SIZE, total: filtered.length, onPage: setPage }}
+          reorder={order.table}
           empty={
             lib.loading ? (
               <EmptyState icon="refresh" title="Loading test cases…" />
@@ -579,6 +621,8 @@ export function TestCaseStudioPage() {
         <CaseEditorDialog
           testCase={editing.tc}
           initialTab={editing.tab}
+          editDetails={editing.tab === 'details'}
+          aiJobId={editing.aiJobId}
           onClose={() => setEditing(undefined)}
           onChanged={lib.reload}
         />
@@ -605,6 +649,7 @@ export function TestCaseStudioPage() {
           }}
         />
       )}
+      {order.dialog}
       {versioning && (
         <AssignVersionDialog
           ids={versioning}

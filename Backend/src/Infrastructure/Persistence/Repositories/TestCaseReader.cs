@@ -25,7 +25,7 @@ internal sealed class TestCaseReader(QaStudioDbContext db) : ITestCaseReader
         GetQuery(db, caseCode, cancellationToken);
 
     public async Task<IReadOnlyList<TestCaseReadModel>> GetManyAsync(IReadOnlyCollection<string> caseCodes, CancellationToken cancellationToken) =>
-        await Project(db, db.TestCases.Where(c => caseCodes.Contains(c.CaseCode)).OrderBy(c => c.Id))
+        await Project(db, InListOrder(db.TestCases.Where(c => caseCodes.Contains(c.CaseCode))))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -64,7 +64,7 @@ internal sealed class TestCaseReader(QaStudioDbContext db) : ITestCaseReader
         }
 
         var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await Project(db, query.OrderBy(c => c.Id).Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize))
+        var items = await Project(db, InListOrder(query).Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         return (items, total);
@@ -84,6 +84,10 @@ internal sealed class TestCaseReader(QaStudioDbContext db) : ITestCaseReader
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.Key, g => g.Count, cancellationToken)
             .ConfigureAwait(false);
+
+    // The order people set (see TestCase.SortOrder); a case nobody has moved keeps its place by Id.
+    private static IOrderedQueryable<TestCase> InListOrder(IQueryable<TestCase> query) =>
+        query.OrderBy(c => c.SortOrder ?? c.Id).ThenBy(c => c.Id);
 
     // Split query: joining steps into a page of cases would repeat every wide case row once per step.
     private static IQueryable<TestCaseReadModel> Project(QaStudioDbContext context, IQueryable<TestCase> query) =>

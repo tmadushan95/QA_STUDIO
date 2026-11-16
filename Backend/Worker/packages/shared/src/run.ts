@@ -21,6 +21,11 @@ export type Failure = z.infer<typeof Failure>;
 export const StepResult = z.object({
   index: z.number().int().min(0),
   action: z.string(),
+  /**
+   * The step as a sentence for people, such as `Click button "Delete"`. Built from the step as written (parameters
+   * still as `{{data.name}}`), so no test data or secret ends up in it. Missing on results saved before it existed.
+   */
+  description: z.string().optional(),
   status: ExecutionStatus,
   durationMs: z.number().min(0),
   failure: Failure.optional(),

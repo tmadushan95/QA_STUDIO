@@ -35,7 +35,7 @@ internal sealed class UpdateTestCaseHandler(
         var source = new TestCaseSource(testCase.SourceWorkbook, testCase.SourceWorksheet, testCase.SourceRowNumber);
         var now = clock.UtcNow;
         // Steps left out of the request are kept, including their expected results, which the request form cannot carry.
-        var steps = request.Input.Steps is null
+        var steps = !request.Input.HasSteps
             ? testCase.Steps.Select(s => new TestCaseStep(s.StepOrder, s.Action, s.Expected)).ToList()
             : request.Input.ToSteps().ToList();
         testCase.Update(request.Input.ToContent(source, testCase.DependsOnJson, testCase.Readiness), steps, now);

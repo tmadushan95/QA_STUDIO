@@ -56,4 +56,7 @@ public static class AuditActions
 
     /// <summary>Test cases were filed elsewhere.</summary>
     public const string CaseMove = "inventory.move";
+
+    /// <summary>Test cases were put in a new order.</summary>
+    public const string CaseReorder = "inventory.reorder";
 }

@@ -6,7 +6,7 @@ import {
   CASE_FORMATS,
   COVERAGE_LEVELS,
   MAX_PROMPT_CHARS,
-  MAX_PROPOSED,
+  MAX_PROPOSED_THOROUGH,
   ProposedCaseSchema,
   diagnoseFailure,
   generateScenario,
@@ -22,6 +22,7 @@ import {
   type ProposedCase,
   type Skill,
   type SkillUsage,
+  type StepDraft,
 } from '@qa-studio/agents';
 import type { KnowledgeIndex } from '@qa-studio/knowledge';
 import { LlmError, completeJson } from '@qa-studio/llm';
@@ -51,6 +52,8 @@ export interface GenerateJob {
   total: number;
   done: number;
   startedAt: string;
+  /** Every case the job writes steps for, so pages can hold those cases still until it ends. */
+  caseIds: string[];
   endedAt?: string;
   results: GenerateResult[];
   /** Set when the whole job stopped early (for example the API key was rejected). */
@@ -75,6 +78,16 @@ export interface AiTasksDeps {
   explore?: (paths: string[], accountId: string | undefined) => Promise<ExploredPage[]>;
   /** Saved skills a prompt can call with `/skill-name` (AI Assistant › Skills). */
   skills?: () => Skill[];
+}
+
+/** Steps the AI proposes after a tester asked for a change. Not saved. */
+export interface RevisedSteps {
+  steps: StepDraft[];
+  /** What the AI based them on, its assumptions, and what needs parameters or a manual check. */
+  note: string;
+  /** Problems the AI could not fix; the tester sees them on the steps after accepting. */
+  issues: string[];
+  warnings: string[];
 }
 
 /** Proposed cases, and which skills the prompt called. */
@@ -199,6 +212,7 @@ export class AiTasks {
       total: unique.length,
       done: 0,
       startedAt: new Date().toISOString(),
+      caseIds: unique,
       results: [],
     };
     const abort = new AbortController();
@@ -414,6 +428,63 @@ export class AiTasks {
   }
 
   /**
+   * Revise a case's steps as a tester asks ("also check the popup title"). The answer goes through the same checks and
+   * repairs as new steps, and is only returned: the tester reviews it in the editor and saves it themselves.
+   */
+  async reviseSteps(input: unknown): Promise<RevisedSteps> {
+    const p = z
+      .object({
+        caseId: z.string().min(1),
+        steps: z
+          .array(
+            z.object({
+              action: z.string().min(1).max(100),
+              params: z.record(z.string(), z.unknown()).default({}),
+            }),
+          )
+          .max(60),
+        instruction: z.string().trim().min(1).max(2000),
+      })
+      .safeParse(input);
+    if (!p.success) {
+      const message = 'Say what should change in the steps.';
+      throw new HttpError(400, 'invalid-request', message, { instruction: message });
+    }
+    const { caseId, steps, instruction } = p.data;
+    const testCase = this.d.inventory.get(caseId);
+    if (!testCase)
+      throw new HttpError(404, 'unknown-case', `The test case ${caseId} no longer exists.`);
+    let out: Awaited<ReturnType<typeof generateScenario>>;
+    try {
+      out = await generateScenario({
+        gateway: this.d.ai.gateway(),
+        testCase,
+        actions: this.d.actions(),
+        knowledge: this.d.knowledge,
+        ...(this.d.pages && { pages: this.d.pages(testCase.projectId) }),
+        validate: (s) => this.d.scenarios.validate({ schemaVersion: 1, caseId, steps: s }),
+        revise: { steps, instruction },
+      });
+    } catch (e) {
+      throw toHttp(e);
+    }
+    this.d.audit('ai.steps.revise', caseId, `Revised steps proposed: ${out.status}.`);
+    if (out.status === 'unmappable') {
+      const missing =
+        out.missingCapabilities.length > 0
+          ? ` Missing: ${out.missingCapabilities.join('; ')}.`
+          : '';
+      throw new HttpError(422, 'cannot-revise', `${out.reason}${missing}`);
+    }
+    return {
+      steps: out.steps,
+      note: out.note,
+      issues: out.status === 'needs-fixing' ? out.issues : [],
+      warnings: out.warnings,
+    };
+  }
+
+  /**
    * Explain a failed case: is the test out of date, or did the app not do what the case expects? A "test-fix" becomes
    * a new draft for review next to the approved scenario; a likely defect is reported as such and nothing changes.
    */
@@ -573,7 +644,11 @@ export class AiTasks {
       projectVersionId?: number | undefined;
     } = {},
   ): TestCase[] {
-    const parsed = z.array(ProposedCaseSchema).min(1).max(MAX_PROPOSED).safeParse(proposals);
+    const parsed = z
+      .array(ProposedCaseSchema)
+      .min(1)
+      .max(MAX_PROPOSED_THOROUGH)
+      .safeParse(proposals);
     if (!parsed.success) {
       throw new HttpError(
         400,

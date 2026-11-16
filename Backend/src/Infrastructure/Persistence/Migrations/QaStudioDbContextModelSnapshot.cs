@@ -548,6 +548,9 @@ namespace QaStudio.Infrastructure.Persistence.Migrations
                         .HasMaxLength(400)
                         .HasColumnType("nvarchar(400)");
 
+                    b.Property<long?>("SortOrder")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("SourceRowNumber")
                         .HasColumnType("int");
 

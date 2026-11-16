@@ -156,6 +156,8 @@ describe('generate automation drafts', () => {
     expect(started.statusCode).toBe(202);
     const job = await finished(app, started.json().id);
     expect(job).toMatchObject({ status: 'done', total: 2, done: 2, provider: 'fake' });
+    // Pages hold these cases still while the job runs.
+    expect(job.caseIds).toEqual(['TC_1', 'TC_2']);
     expect(job.results).toEqual([
       { caseId: 'TC_1', outcome: 'drafted', message: 'Needs parameters: draftProject.' },
       {
@@ -273,6 +275,52 @@ describe('generate automation drafts', () => {
     const items = (await app.inject({ url: '/api/ai/jobs' })).json().items as GenerateJob[];
     expect(items.map((j) => j.id)).toEqual([b, a]);
     expect((await app.inject({ url: '/api/ai/jobs/nope' })).statusCode).toBe(404);
+  });
+});
+
+describe('revise steps on request', () => {
+  const revise = (app: ReturnType<typeof createApp>, payload: object) =>
+    app.inject({ method: 'POST', url: '/api/ai/steps/revise', payload });
+  const current = [{ action: 'project.click-delete', params: {} }];
+
+  it('returns revised, checked steps for review and saves nothing', async () => {
+    const { app, ai, fake, scenarios } = setup([goodAnswer]);
+    turnOn(ai);
+    const res = await revise(app, {
+      caseId: 'TC_1',
+      steps: current,
+      instruction: 'Open the draft project first',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      steps: [{ action: 'drafts.open-project' }, { action: 'project.click-delete' }],
+      issues: [],
+    });
+    expect(scenarios.get('TC_1').draft).toBeUndefined();
+    // The model sees the current steps and the change asked for.
+    const prompt = fake.requests[0]!.messages[0]!.content;
+    expect(prompt).toContain('<current_scenario>');
+    expect(prompt).toContain('project.click-delete');
+    expect(prompt).toContain('Open the draft project first');
+  });
+
+  it('reports problems it could not fix instead of hiding them', async () => {
+    const bad = JSON.stringify({ steps: [{ action: 'made.up', params: {} }] });
+    const { app, ai } = setup([bad, bad, bad]);
+    turnOn(ai);
+    const res = await revise(app, { caseId: 'TC_1', steps: current, instruction: 'Change it' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().issues[0]).toContain('Unknown action "made.up"');
+  });
+
+  it('asks for an instruction and a known case', async () => {
+    const { app, ai } = setup([]);
+    turnOn(ai);
+    const empty = await revise(app, { caseId: 'TC_1', steps: current, instruction: '  ' });
+    expect(empty.statusCode).toBe(400);
+    expect(empty.json().error.fields.instruction).toBeTruthy();
+    const unknown = await revise(app, { caseId: 'NOPE', steps: current, instruction: 'x' });
+    expect(unknown.statusCode).toBe(404);
   });
 });
 
@@ -438,14 +486,14 @@ describe('test cases from a prompt', () => {
     expect(bad.json().error.message).toContain('Check the API key');
   });
 
-  it('refuses incomplete cases and more than ten at once', async () => {
+  it('refuses incomplete cases and more than twenty (a thorough request) at once', async () => {
     const { app } = setup();
     const empty = await post(app, '/api/ai/cases', {
       cases: [{ title: 'No steps', steps: [], expectedResult: 'ok ok' }],
     });
     expect(empty.statusCode).toBe(400);
     expect(Object.keys(empty.json().error.fields)[0]).toContain('steps');
-    const many = Array.from({ length: 11 }, (_, i) => ({
+    const many = Array.from({ length: 21 }, (_, i) => ({
       title: `Case ${i}`,
       steps: ['x'],
       expectedResult: 'ok ok',

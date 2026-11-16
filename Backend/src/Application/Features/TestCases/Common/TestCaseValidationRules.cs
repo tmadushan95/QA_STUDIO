@@ -13,6 +13,12 @@ internal sealed class TestCaseInputValidator : AbstractValidator<TestCaseInput>
         var (maxSteps, maxLength) = (limits.Value.MaxStepsPerCase, limits.Value.MaxStepLength);
         RuleFor(c => c.Steps).Must(s => s is null || s.Count <= maxSteps).WithMessage($"At most {maxSteps} steps.");
         RuleForEach(c => c.Steps).MaximumLength(maxLength);
+        RuleFor(c => c.WrittenSteps).Must(s => s is null || s.Count <= maxSteps).WithMessage($"At most {maxSteps} steps.");
+        RuleForEach(c => c.WrittenSteps).ChildRules(step =>
+        {
+            step.RuleFor(s => s.Action).MaximumLength(maxLength);
+            step.RuleFor(s => s.Expected).MaximumLength(maxLength);
+        });
     }
 }
 

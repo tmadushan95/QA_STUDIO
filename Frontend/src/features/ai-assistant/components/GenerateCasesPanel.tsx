@@ -11,6 +11,9 @@
  *   their steps from the platform's step catalog and the project's page names. A case it can only partly automate
  *   gets a draft plus a "check by hand" note instead of a refusal.
  *
+ * - Coverage (smoke, standard, thorough) sets how far the AI goes through its checklist (functional, negative,
+ *   permission, validation, boundary, UI, accessibility, error handling). Each card shows its category, and the bar
+ *   above the cards shows which categories are covered and which are not.
  * - `/skill-name` in the prompt applies a saved skill (its instructions shape the cases); the server resolves it, and
  *   the panel shows which skills were applied and which `/words` matched none.
  *
@@ -25,6 +28,7 @@ import {
   EmptyState,
   Field,
   Icon,
+  Select,
   StatusBadge,
   TextArea,
   useToast,
@@ -44,11 +48,14 @@ import {
   startDrafts,
   type AiStatus,
   type DraftJob,
+  CASE_CATEGORIES,
+  type CaseCategory,
   type ProposeOptions,
   type ProposedCase,
   type SkillUsage,
 } from '../api.js';
 import { OUTCOME } from '../outcomes.js';
+import { readDraft, writeDraft } from '../proposalDraft.js';
 import { SkillsDialog } from './SkillsDialog.js';
 import styles from './GenerateCasesPanel.module.css';
 
@@ -91,6 +98,30 @@ const EXAMPLES = [
   },
 ];
 
+type Coverage = NonNullable<ProposeOptions['coverage']>;
+
+/** How widely the AI covers a description; "thorough" goes through the whole checklist, UI and accessibility included. */
+const COVERAGE_CHOICES: { value: Coverage; label: string }[] = [
+  { value: 'smoke', label: 'Smoke (1–3 cases)' },
+  { value: 'standard', label: 'Standard' },
+  { value: 'thorough', label: 'Thorough (incl. UI, accessibility)' },
+];
+
+/**
+ * Which checklist categories the proposals cover and how often, in checklist order, and which none covers. Shown over
+ * the cards so a missing permission or UI case is obvious before saving.
+ */
+function coverageOf(proposals: ProposedCase[]) {
+  const counts = new Map<CaseCategory, number>();
+  for (const p of proposals)
+    if (p.category) counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+  const all = Object.keys(CASE_CATEGORIES) as CaseCategory[];
+  return {
+    covered: all.filter((c) => counts.has(c)).map((c) => ({ category: c, count: counts.get(c)! })),
+    missing: all.filter((c) => !counts.has(c)),
+  };
+}
+
 /** A saved proposal and the AI's step-writing result for it, once known. */
 interface Saved {
   id: string;
@@ -106,16 +137,40 @@ export function GenerateCasesPanel({
   onSaved,
 }: GenerateCasesPanelProps) {
   const toast = useToast();
-  const [prompt, setPrompt] = useState('');
-  const [proposals, setProposals] = useState<ProposedCase[]>([]);
-  const [chosen, setChosen] = useState<Set<number>>(new Set());
+  // Unsaved work comes back when the panel opens again after leaving the tab or page (see proposalDraft.ts).
+  const [draft] = useState(() => readDraft(target.projectId));
+  const [prompt, setPrompt] = useState(draft?.prompt ?? '');
+  const [proposals, setProposals] = useState<ProposedCase[]>(draft?.proposals ?? []);
+  const [chosen, setChosen] = useState<Set<number>>(() => new Set(draft?.chosen));
   const [writeSteps, setWriteSteps] = useState(true);
+  const [coverage, setCoverage] = useState<Coverage>(draft?.coverage ?? 'standard');
   const [busy, setBusy] = useState<'' | 'propose' | 'save'>('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<Saved[]>([]);
   const [jobId, setJobId] = useState<string>();
-  const [usage, setUsage] = useState<SkillUsage>();
+  const [usage, setUsage] = useState<SkillUsage | undefined>(draft?.usage);
   const [managing, setManaging] = useState(false);
+
+  // Keep the draft in step with the screen; saving or discarding empties the proposals, which forgets it. When the
+  // project changes in place, the proposals move with the screen, so the old project's copy is dropped rather than
+  // offered again later (it would be saved twice).
+  const draftProject = useRef(target.projectId);
+  useEffect(() => {
+    if (draftProject.current !== target.projectId) {
+      writeDraft(draftProject.current, { prompt: '', proposals: [], chosen: [] });
+      draftProject.current = target.projectId;
+    }
+    writeDraft(target.projectId, { prompt, proposals, chosen: [...chosen], usage, coverage });
+  }, [target.projectId, prompt, proposals, chosen, usage, coverage]);
+
+  // Moving around the app keeps the proposals, but closing the browser tab would lose them, so the browser asks first.
+  const hasProposals = proposals.length > 0;
+  useEffect(() => {
+    if (!hasProposals) return;
+    const ask = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', ask);
+    return () => window.removeEventListener('beforeunload', ask);
+  }, [hasProposals]);
   // A worker without skills (older build) answers 404: the panel then works exactly as before, with no skill chips.
   const skills = useResource(fetchSkills);
   const jobs = useResource(fetchDraftJobs);
@@ -219,7 +274,9 @@ export function GenerateCasesPanel({
     setBusy('propose');
     setError('');
     try {
-      const { cases: p, skills: used } = await proposeCases(prompt.trim(), target.projectId);
+      const { cases: p, skills: used } = await proposeCases(prompt.trim(), target.projectId, {
+        coverage,
+      });
       setProposals(p);
       setChosen(new Set(p.map((_, i) => i)));
       setUsage(used);
@@ -270,6 +327,7 @@ export function GenerateCasesPanel({
   const savedSkills = skills.data ?? [];
   /** With proposals on screen the prompt box shrinks, so they start right below it. */
   const compact = proposals.length > 0;
+  const { covered, missing } = coverageOf(proposals);
 
   const edit = (i: number, patch: Partial<ProposedCase>) =>
     setProposals((list) => list.map((p, n) => (n === i ? { ...p, ...patch } : p)));
@@ -362,6 +420,20 @@ export function GenerateCasesPanel({
               </div>
             )}
             {targetControls}
+            <label className={styles.coverage}>
+              <span className={styles.sub}>Coverage:</span>
+              <Select
+                aria-label="Coverage"
+                value={coverage}
+                onChange={(e) => setCoverage(e.target.value as Coverage)}
+              >
+                {COVERAGE_CHOICES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </label>
             <Checkbox
               label="Write runnable steps after saving"
               hint="The AI turns each saved case into steps from the step catalog; you review them before they run."
@@ -392,8 +464,22 @@ export function GenerateCasesPanel({
                     {plural(proposals.length, 'proposed test case')} · {chosen.size} selected
                   </h3>
                   <p className={styles.sub}>
-                    Not saved yet. They will be filed under {targetLabel}.
+                    Not saved yet. They stay here while you visit other pages, until you save or
+                    discard them. They will be filed under {targetLabel}.
                   </p>
+                  {covered.length > 0 && (
+                    <p className={styles.sub}>
+                      Covers:{' '}
+                      {covered.map(({ category, count }) => (
+                        <Badge key={category} tone="info">
+                          {CASE_CATEGORIES[category]} {count}
+                        </Badge>
+                      ))}
+                      {missing.length > 0 && (
+                        <> · Not covered: {missing.map((c) => CASE_CATEGORIES[c]).join(', ')}</>
+                      )}
+                    </p>
+                  )}
                   {usage && usage.applied.length > 0 && (
                     <p className={styles.sub}>
                       Skills applied:{' '}
@@ -459,6 +545,8 @@ export function GenerateCasesPanel({
                           {p.priority}
                         </Badge>
                       )}
+                      {p.category && <Badge tone="info">{CASE_CATEGORIES[p.category]}</Badge>}
+                      {p.manualCheck && <Badge tone="neutral">Check by eye</Badge>}
                       {p.module && <span className={styles.sub}>{p.module}</span>}
                     </div>
                     {/* Two lines, so a long title shows in full; a title stays one line when saved. */}

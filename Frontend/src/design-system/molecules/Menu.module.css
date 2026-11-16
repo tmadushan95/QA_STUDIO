@@ -22,6 +22,15 @@
   top: auto;
   bottom: calc(100% + var(--space-1));
 }
+/* Set by Menu when it fits neither way inside a scrolling box; Menu sets top and left from the trigger's position. */
+.menu[data-placement='float'] {
+  position: fixed;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  left: 0;
+  z-index: 40;
+}
 .item {
   display: flex;
   align-items: center;

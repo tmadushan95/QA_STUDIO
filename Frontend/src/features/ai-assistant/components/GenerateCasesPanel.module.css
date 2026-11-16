@@ -109,6 +109,12 @@
   align-items: center;
   gap: var(--space-3) var(--space-6);
 }
+/* Coverage: a label and its drop-down on one line. */
+.coverage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
 /* Saved skills: a chip puts /name into the prompt. */
 .skills {
   display: flex;

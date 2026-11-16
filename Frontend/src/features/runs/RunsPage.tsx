@@ -384,7 +384,12 @@ function RunDetail({ id }: { id: string }) {
                             {s.index + 1}
                           </span>
                           <StatusBadge status={s.status} />
-                          <code>{s.action}</code>
+                          {/* The sentence leads; runs saved before it existed show the action name. */}
+                          {s.description ? (
+                            <span title={s.action}>{s.description}</span>
+                          ) : (
+                            <code>{s.action}</code>
+                          )}
                           <span className={styles.muted}>{formatDuration(s.durationMs)}</span>
                           {s.failure && (
                             <span className={styles.stepFail}>{s.failure.message}</span>

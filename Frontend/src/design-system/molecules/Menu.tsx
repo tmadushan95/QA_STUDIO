@@ -49,11 +49,26 @@ export function Menu({ label, items, triggerLabel }: MenuProps) {
   // bottom of whatever clips it, such as the last rows of a table that scrolls inside itself, and there is room above.
   useLayoutEffect(() => {
     const el = list.current;
-    if (!open || !el) return;
+    const trigger = button.current;
+    if (!open || !el || !trigger) return;
     const rect = el.getBoundingClientRect();
     const bounds = clippingBounds(el);
-    const roomAbove = (button.current?.getBoundingClientRect().top ?? 0) - bounds.top;
-    if (rect.bottom > bounds.bottom && roomAbove > rect.height) el.dataset.placement = 'up';
+    const anchor = trigger.getBoundingClientRect();
+    if (rect.bottom <= bounds.bottom) return;
+    if (anchor.top - bounds.top > rect.height) {
+      el.dataset.placement = 'up';
+      return;
+    }
+    // Fits neither way inside the clipping box (a short table that scrolls inside itself), so the list would be cut
+    // off and spill over the cells beside it. Float it over the page instead, right-aligned under the trigger.
+    el.dataset.placement = 'float';
+    // Where top/left 0 now lands: the window, unless an ancestor with a transform or filter anchors fixed boxes.
+    const origin = el.getBoundingClientRect();
+    const gap = rect.top - anchor.bottom;
+    const fitsBelow = anchor.bottom + gap + origin.height <= window.innerHeight;
+    const top = fitsBelow ? anchor.bottom + gap : Math.max(anchor.top - gap - origin.height, 0);
+    el.style.top = `${top - origin.top}px`;
+    el.style.left = `${Math.max(anchor.right - origin.width, 0) - origin.left}px`;
   }, [open]);
 
   useEffect(() => {
@@ -62,8 +77,19 @@ export function Menu({ label, items, triggerLabel }: MenuProps) {
     const away = (e: MouseEvent) => {
       if (!list.current?.contains(e.target as Node) && e.target !== button.current) setOpen(false);
     };
+    // A floating list is pinned to the window, so it would drift away from its row once anything scrolls.
+    const floating = list.current?.dataset.placement === 'float';
+    const dismiss = () => setOpen(false);
     document.addEventListener('mousedown', away);
-    return () => document.removeEventListener('mousedown', away);
+    if (floating) {
+      window.addEventListener('scroll', dismiss, true);
+      window.addEventListener('resize', dismiss);
+    }
+    return () => {
+      document.removeEventListener('mousedown', away);
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
   }, [open]);
 
   const close = () => {

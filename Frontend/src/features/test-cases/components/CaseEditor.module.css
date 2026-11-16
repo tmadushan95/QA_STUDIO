@@ -269,6 +269,63 @@
   margin: var(--space-1) 0 0;
   white-space: pre-wrap;
 }
+/* Details edit form */
+.detailsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-4);
+}
+.writtenEdit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.writtenList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.writtenRow {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 3fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+.writtenNo {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: right;
+}
+.writtenTools {
+  display: inline-flex;
+}
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+@media (max-width: 40rem) {
+  /* On phones the action and expected result stack under the step number. */
+  .writtenRow {
+    grid-template-columns: 1.5rem minmax(0, 1fr);
+  }
+  .writtenRow > :nth-child(n + 3) {
+    grid-column: 2;
+  }
+}
 .written {
   display: flex;
   flex-direction: column;

@@ -5,7 +5,42 @@ import type {
   Scenario,
   StepResult,
 } from '@qa-studio/shared';
-import type { ActionContext, ActionRegistry } from './registry.js';
+import { describeTarget, type Target } from './generic/target.js';
+import {
+  humanizeActionName,
+  type ActionContext,
+  type ActionDefinition,
+  type ActionRegistry,
+} from './registry.js';
+
+/**
+ * A step as a sentence for reports: the action's editor summary ("Click {target}") with its values filled in. A summary
+ * without placeholders (a custom step, an application step) gets its values listed after it instead, so the report
+ * still says which project or role the step used. Pass the step as written, before `{{data.*}}` is resolved, so
+ * passwords and other test data never reach the report.
+ */
+export function describeStep(
+  def: ActionDefinition | undefined,
+  action: string,
+  params: unknown,
+): string {
+  const values = (params && typeof params === 'object' ? params : {}) as Record<string, unknown>;
+  const fields = def?.ui?.fields ?? [];
+  const show = (key: string): string => {
+    const v = values[key];
+    if (v === undefined || v === null || v === '') return '…';
+    const kind = fields.find((f) => f.name === key)?.kind;
+    if (kind === 'target' && typeof v === 'object') return describeTarget(v as Target);
+    return typeof v === 'object' ? JSON.stringify(v) : String(v);
+  };
+  const summary = def?.ui?.summary ?? humanizeActionName(action);
+  if (/\{\w+\}/.test(summary)) return summary.replace(/\{(\w+)\}/g, (_, key: string) => show(key));
+  const label = (key: string) => fields.find((f) => f.name === key)?.label ?? key;
+  const listed = Object.keys(values)
+    .filter((k) => k !== 'destructive' && values[k] !== undefined && values[k] !== '')
+    .map((k) => `${label(k)}: ${show(k)}`);
+  return listed.length ? `${summary} (${listed.join(', ')})` : summary;
+}
 
 /** The application did not behave as the scenario expects. */
 export class AssertionFailure extends Error {
@@ -121,19 +156,21 @@ export async function runScenario(
 ): Promise<ScenarioOutcome> {
   const ctx: ActionContext = { ...base, vars: {} };
   const planned = scenario.steps.map((s, index) => {
+    const step = {
+      index,
+      action: s.action,
+      description: describeStep(registry.get(s.action), s.action, s.params),
+    };
     const resolved = resolveData(s.params, ctx.env.data ?? {});
-    if (!resolved.ok) return { index, action: s.action, error: resolved.reason };
+    if (!resolved.ok) return { ...step, error: resolved.reason };
     const v = registry.validate(s.action, resolved.value);
     if (v.ok && registry.isDestructive(s.action, v.params) && !opts.allowDestructive) {
       return {
-        index,
-        action: s.action,
+        ...step,
         error: `Action "${s.action}" is destructive and was not explicitly allowed.`,
       };
     }
-    return v.ok
-      ? { index, action: s.action, params: v.params }
-      : { index, action: s.action, error: v.reason };
+    return v.ok ? { ...step, params: v.params } : { ...step, error: v.reason };
   });
 
   const blocked = planned.filter((p) => 'error' in p);
@@ -143,11 +180,18 @@ export async function runScenario(
         ? {
             index: p.index,
             action: p.action,
+            description: p.description,
             status: 'blocked',
             durationMs: 0,
             failure: { kind: 'blocked', message: p.error! },
           }
-        : { index: p.index, action: p.action, status: 'skipped', durationMs: 0 },
+        : {
+            index: p.index,
+            action: p.action,
+            description: p.description,
+            status: 'skipped',
+            durationMs: 0,
+          },
     );
     return {
       status: 'blocked',
@@ -169,6 +213,7 @@ export async function runScenario(
       steps.push({
         index: p.index,
         action: p.action,
+        description: p.description,
         status: cancelled ? 'cancelled' : 'skipped',
         durationMs: 0,
       });
@@ -185,6 +230,7 @@ export async function runScenario(
       steps.push({
         index: p.index,
         action: p.action,
+        description: p.description,
         status: 'passed',
         durationMs: Date.now() - started,
       });
@@ -197,6 +243,7 @@ export async function runScenario(
       steps.push({
         index: p.index,
         action: p.action,
+        description: p.description,
         status: status === 'cancelled' ? 'cancelled' : 'failed',
         durationMs: Date.now() - started,
         failure,
