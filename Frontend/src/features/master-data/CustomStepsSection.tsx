@@ -6,7 +6,7 @@
  * Example: "Check a permission" with inputs Role and Permission, whose body opens the Roles page, clicks the role and
  * checks that the permission is shown. Test cases then only say which role and which permission.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -256,6 +256,17 @@ function CustomStepDialog({
     (step?.inputs ?? []).map((i) => ({ ...i, auto: false })),
   );
   const [body, setBody] = useState(step?.steps ?? []);
+  // Opens full screen, like the test case editor, so the steps and their fields show in full.
+  const [expanded, setExpanded] = useState(true);
+  /** Set by "Add input": its label box takes focus once it is on screen. */
+  const focusInput = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusInput.current === null) return;
+    document
+      .querySelector<HTMLInputElement>(`[aria-label="Input ${focusInput.current}: label"]`)
+      ?.focus();
+    focusInput.current = null;
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -295,233 +306,323 @@ function CustomStepDialog({
   // The recipe's body may use only the standard steps.
   const standard = (catalog?.actions ?? []).filter((a) => a.source === 'generic');
 
+  // What still stands between the form and Save, said in words (the button alone would just be greyed out).
+  const todo = [
+    { done: label.trim() !== '', text: label.trim() ? 'Name given' : 'Give it a name' },
+    {
+      done: key !== '' && !clash,
+      text: !key
+        ? 'Give it a short name'
+        : clash
+          ? 'Choose another short name'
+          : 'Short name is free',
+    },
+    {
+      done: body.length > 0,
+      text: body.length > 0 ? `${plural(body.length, 'step')} to run` : 'Add at least one step',
+    },
+  ];
+  const firstTodo = todo.find((t) => !t.done);
+  // Visible heading above an input's box; the box names itself (aria-label), so it reads "Input 1: label".
+  const inputLabel = (what: string) => (
+    <span className={styles.inputLabel} aria-hidden="true">
+      {what}
+    </span>
+  );
+
   return (
     <Dialog
       title={isNew ? 'New custom step' : `Edit “${step?.label ?? ''}”`}
       subtitle="A reusable recipe of steps for this project"
       size="lg"
+      expanded={expanded}
       dirty={dirty}
       onClose={onClose}
       onSave={() => void save()}
+      headerActions={
+        <IconButton
+          icon="expand"
+          label={expanded ? 'Exit full screen' : 'Full screen'}
+          onClick={() => setExpanded((x) => !x)}
+        />
+      }
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            variant="primary"
-            loading={busy}
-            disabled={!label.trim() || !key || clash || body.length === 0}
-            onClick={() => void save()}
+          <span
+            className={styles.footerNote}
+            data-tone={firstTodo ? 'warn' : 'ok'}
+            aria-live="polite"
           >
-            Save custom step
-          </Button>
+            <Icon name={firstTodo ? 'info' : 'check'} size={16} />
+            <span>
+              {firstTodo
+                ? `To save: ${firstTodo.text.charAt(0).toLowerCase()}${firstTodo.text.slice(1)}.`
+                : dirty
+                  ? 'Ready to save · unsaved'
+                  : 'Ready to save'}
+            </span>
+          </span>
+          <div className={styles.footerActions}>
+            <Button className={styles.cancel} data-dialog-close>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={busy}
+              disabled={!label.trim() || !key || clash || body.length === 0}
+              onClick={() => void save()}
+            >
+              Save custom step
+            </Button>
+          </div>
         </>
       }
     >
-      <div className={styles.form}>
-        {error && <Alert tone="danger">{error}</Alert>}
+      <div className={styles.layout}>
+        <div className={styles.form}>
+          {error && <Alert tone="danger">{error}</Alert>}
 
-        <section className={styles.section} aria-label="Name">
-          <h3 className={styles.sectionTitle}>
-            <span>1</span> What is it called?
-          </h3>
-          <div className={styles.two}>
-            <Field
-              label="Name"
-              required
-              hint="How it appears in the step list, for example “Check a permission”."
-            >
-              {(p) => (
-                <TextInput
-                  {...p}
-                  data-autofocus
-                  value={label}
-                  maxLength={80}
-                  onChange={(e) => {
-                    setLabel(e.target.value);
-                    if (keyAuto) setKey(stepKey(e.target.value));
-                  }}
-                />
-              )}
-            </Field>
-            <Field
-              label="Short name"
-              required
-              hint={
-                clash ? undefined : 'Lowercase, used inside the project. Cannot change once saved.'
-              }
-              error={
-                clash ? 'This project already has a custom step with this short name.' : undefined
-              }
-            >
-              {(p) => (
-                <TextInput
-                  {...p}
-                  value={key}
-                  disabled={!isNew}
-                  maxLength={48}
-                  onChange={(e) => {
-                    setKeyAuto(false);
-                    setKey(e.target.value.toLowerCase());
-                  }}
-                />
-              )}
-            </Field>
-          </div>
-          <Field label="What does it do?" hint="Optional. Shown to people choosing the step.">
-            {(p) => (
-              <TextArea
-                {...p}
-                rows={2}
-                value={description}
-                maxLength={500}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            )}
-          </Field>
-        </section>
-
-        <section className={styles.section} aria-label="Inputs">
-          <h3 className={styles.sectionTitle}>
-            <span>2</span> What do test cases fill in?
-          </h3>
-          <p className={styles.muted}>
-            Each input becomes a field when the step is used. Leave this empty if the step always
-            does exactly the same thing.
-          </p>
-          {inputs.length > 0 && (
-            <ul className={styles.inputs} aria-label="Inputs">
-              {inputs.map((i, n) => (
-                <li key={n} className={styles.inputRow}>
+          <section className={styles.section} aria-label="Name">
+            <h3 className={styles.sectionTitle}>
+              <span>1</span> Name and description
+            </h3>
+            <div className={styles.two}>
+              <Field
+                label="Name"
+                required
+                hint="How it appears in the step list, for example “Check a permission”."
+              >
+                {(p) => (
                   <TextInput
-                    aria-label={`Input ${n + 1}: label`}
-                    placeholder="Label, e.g. Role"
-                    value={i.label}
+                    {...p}
+                    data-autofocus
+                    value={label}
                     maxLength={80}
-                    onChange={(e) =>
-                      setInput(n, {
-                        label: e.target.value,
-                        ...(i.auto && { name: inputName(e.target.value) }),
-                      })
-                    }
+                    onChange={(e) => {
+                      setLabel(e.target.value);
+                      if (keyAuto) setKey(stepKey(e.target.value));
+                    }}
                   />
+                )}
+              </Field>
+              <Field
+                label="Short name"
+                required
+                hint={
+                  clash
+                    ? undefined
+                    : 'Filled in from the name. Lowercase, used inside the project. Cannot change once saved.'
+                }
+                error={
+                  clash ? 'This project already has a custom step with this short name.' : undefined
+                }
+              >
+                {(p) => (
                   <TextInput
-                    aria-label={`Input ${n + 1}: name used in steps`}
-                    className={styles.mono}
-                    placeholder="name"
-                    value={i.name}
-                    maxLength={64}
-                    onChange={(e) => setInput(n, { name: e.target.value, auto: false })}
+                    {...p}
+                    value={key}
+                    disabled={!isNew}
+                    maxLength={48}
+                    onChange={(e) => {
+                      setKeyAuto(false);
+                      setKey(e.target.value.toLowerCase());
+                    }}
                   />
-                  <Select
-                    aria-label={`Input ${n + 1}: type`}
-                    value={i.kind}
-                    onChange={(e) => setInput(n, { kind: e.target.value as CustomInput['kind'] })}
-                  >
-                    {KINDS.map((k) => (
-                      <option key={k.value} value={k.value}>
-                        {k.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <Checkbox
-                    label="Required"
-                    checked={i.required}
-                    onChange={(e) => setInput(n, { required: e.target.checked })}
-                  />
-                  <IconButton
-                    icon="trash"
-                    label={`Remove input ${n + 1}`}
-                    onClick={() => setInputs(inputs.filter((_, j) => j !== n))}
-                  />
-                  {i.kind === 'choice' && (
-                    <TextInput
-                      aria-label={`Input ${n + 1}: choices`}
-                      className={styles.wideCell}
-                      placeholder="Choices, separated by commas, e.g. Admin, Viewer"
-                      value={(i.options ?? []).join(', ')}
-                      onChange={(e) =>
-                        setInput(n, {
-                          options: e.target.value
-                            .split(',')
-                            .map((o) => o.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                    />
-                  )}
+                )}
+              </Field>
+            </div>
+            <Field label="Description" hint="Optional. Shown to people choosing the step.">
+              {(p) => (
+                <TextArea
+                  {...p}
+                  rows={2}
+                  value={description}
+                  maxLength={500}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              )}
+            </Field>
+          </section>
+
+          <section className={styles.section} aria-label="Inputs">
+            <h3 className={styles.sectionTitle}>
+              <span>2</span> What test cases fill in
+            </h3>
+            <p className={styles.muted}>
+              Each input becomes a field when the step is used, such as the Role to check. Leave
+              this empty if the step always does exactly the same thing.
+            </p>
+            {inputs.length > 0 && (
+              <ul className={styles.inputs} aria-label="Inputs">
+                {inputs.map((i, n) => (
+                  <li key={n} className={styles.inputRow}>
+                    <div className={styles.inputHead}>
+                      <strong>Input {n + 1}</strong>
+                      <Checkbox
+                        label="Required"
+                        checked={i.required}
+                        onChange={(e) => setInput(n, { required: e.target.checked })}
+                      />
+                      <IconButton
+                        icon="trash"
+                        label={`Remove input ${n + 1}`}
+                        onClick={() => setInputs(inputs.filter((_, j) => j !== n))}
+                      />
+                    </div>
+                    <div className={styles.inputFields}>
+                      <div className={styles.inputField}>
+                        {inputLabel('Label shown to testers')}
+                        <TextInput
+                          aria-label={`Input ${n + 1}: label`}
+                          placeholder="e.g. Role"
+                          value={i.label}
+                          maxLength={80}
+                          onChange={(e) =>
+                            setInput(n, {
+                              label: e.target.value,
+                              ...(i.auto && { name: inputName(e.target.value) }),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className={styles.inputField}>
+                        {inputLabel('Name used in steps')}
+                        <TextInput
+                          aria-label={`Input ${n + 1}: name used in steps`}
+                          className={styles.mono}
+                          placeholder="e.g. role"
+                          value={i.name}
+                          maxLength={64}
+                          onChange={(e) => setInput(n, { name: e.target.value, auto: false })}
+                        />
+                      </div>
+                      <div className={styles.inputField}>
+                        {inputLabel('Type of value')}
+                        <Select
+                          aria-label={`Input ${n + 1}: type`}
+                          value={i.kind}
+                          onChange={(e) =>
+                            setInput(n, { kind: e.target.value as CustomInput['kind'] })
+                          }
+                        >
+                          {KINDS.map((k) => (
+                            <option key={k.value} value={k.value}>
+                              {k.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      {i.kind === 'choice' && (
+                        <div className={`${styles.inputField} ${styles.wideCell}`}>
+                          {inputLabel('Choices')}
+                          <TextInput
+                            aria-label={`Input ${n + 1}: choices`}
+                            placeholder="Separated by commas, e.g. Admin, Viewer"
+                            value={(i.options ?? []).join(', ')}
+                            onChange={(e) =>
+                              setInput(n, {
+                                options: e.target.value
+                                  .split(',')
+                                  .map((o) => o.trim())
+                                  .filter(Boolean),
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div>
+              <Button
+                icon="plus"
+                onClick={() => {
+                  focusInput.current = inputs.length + 1;
+                  setInputs([
+                    ...inputs,
+                    { name: '', label: '', kind: 'text', required: true, auto: true },
+                  ]);
+                }}
+              >
+                Add input
+              </Button>
+            </div>
+          </section>
+
+          <section className={styles.section} aria-label="Steps">
+            <h3 className={styles.sectionTitle}>
+              <span>3</span> Steps it runs
+            </h3>
+            <p className={styles.muted}>
+              The steps run in order each time the custom step is used.
+              {names.length > 0 && (
+                <>
+                  {' '}
+                  Press <strong>Use input</strong> under a text box to use an input there.
+                </>
+              )}
+            </p>
+            {catalog ? (
+              <StepEditor
+                steps={body}
+                onChange={setBody}
+                actions={standard}
+                pages={catalog.pages}
+                dataNames={names.filter(Boolean)}
+                tokenKind="input"
+                checks={[]}
+              />
+            ) : (
+              <p className={styles.muted}>Loading the steps…</p>
+            )}
+          </section>
+        </div>
+
+        <aside className={styles.side} aria-label="Preview and checklist">
+          <section className={styles.preview} aria-label="Preview">
+            <h3 className={styles.previewTitle}>
+              <Icon name="info" size={14} /> How it will look in a test case
+            </h3>
+            <div className={styles.previewCard}>
+              <strong>{label.trim() || 'Your custom step'}</strong>
+              {description.trim() && <span className={styles.muted}>{description.trim()}</span>}
+              {inputs.length === 0 ? (
+                <span className={styles.muted}>Nothing to fill in.</span>
+              ) : (
+                <div className={styles.previewFields}>
+                  {inputs.map((i, n) => (
+                    <span key={n} className={styles.previewField}>
+                      <span className={styles.muted}>
+                        {i.label || `Input ${n + 1}`}
+                        {i.required && ' *'}
+                      </span>
+                      <span className={styles.fake}>
+                        {i.kind === 'choice'
+                          ? (i.options?.[0] ?? 'Choose…')
+                          : i.kind === 'boolean'
+                            ? '☐'
+                            : '…'}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+          <section className={styles.checklist} aria-label="Ready to save?">
+            <h3 className={styles.previewTitle}>Ready to save?</h3>
+            <ul>
+              {todo.map((t) => (
+                <li key={t.text} data-done={t.done}>
+                  {/* The mark is decorative; the words say whether it is done. */}
+                  <span aria-hidden="true">{t.done ? '✓' : '○'}</span> {t.text}
                 </li>
               ))}
             </ul>
-          )}
-          <div>
-            <Button
-              icon="plus"
-              onClick={() =>
-                setInputs([
-                  ...inputs,
-                  { name: '', label: '', kind: 'text', required: true, auto: true },
-                ])
-              }
-            >
-              Add input
-            </Button>
-          </div>
-        </section>
-
-        <section className={styles.section} aria-label="Steps">
-          <h3 className={styles.sectionTitle}>
-            <span>3</span> What does it do?
-          </h3>
-          <p className={styles.muted}>
-            The steps run in order each time the custom step is used.
-            {names.length > 0 && (
-              <>
-                {' '}
-                Press <code>{'{ }'}</code> in a text box to use an input there.
-              </>
-            )}
-          </p>
-          {catalog ? (
-            <StepEditor
-              steps={body}
-              onChange={setBody}
-              actions={standard}
-              pages={catalog.pages}
-              dataNames={names.filter(Boolean)}
-              tokenKind="input"
-              checks={[]}
-            />
-          ) : (
-            <p className={styles.muted}>Loading the steps…</p>
-          )}
-        </section>
-
-        <section className={styles.preview} aria-label="Preview">
-          <h3 className={styles.previewTitle}>
-            <Icon name="info" size={14} /> How it will look in a test case
-          </h3>
-          <div className={styles.previewCard}>
-            <strong>{label.trim() || 'Your custom step'}</strong>
-            {inputs.length === 0 ? (
-              <span className={styles.muted}>Nothing to fill in.</span>
-            ) : (
-              <div className={styles.previewFields}>
-                {inputs.map((i, n) => (
-                  <span key={n} className={styles.previewField}>
-                    <span className={styles.muted}>{i.label || `Input ${n + 1}`}</span>
-                    <span className={styles.fake}>
-                      {i.kind === 'choice'
-                        ? (i.options?.[0] ?? 'Choose…')
-                        : i.kind === 'boolean'
-                          ? '☐'
-                          : '…'}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
+          </section>
+        </aside>
       </div>
     </Dialog>
   );

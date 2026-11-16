@@ -347,6 +347,33 @@ describe('runs across test accounts', () => {
     expect(done.summary.total).toBe(4);
   });
 
+  it('signs each account in to several browsers at once when a concurrent run asks for it', async () => {
+    const app = withAccounts(true);
+    const res = await start(app, {
+      caseIds: ['TC-1'],
+      accountIds: ['a1'],
+      mode: 'concurrent',
+      browsersPerUser: 3,
+    });
+    expect(res.statusCode).toBe(202);
+    expect(res.json().cases.map((c: { account: string }) => c.account)).toEqual([
+      'Approver (browser 1)',
+      'Approver (browser 2)',
+      'Approver (browser 3)',
+    ]);
+    const done = await waitDone(app, res.json().id);
+    expect(done.status).toBe('passed');
+    expect(jobs).toHaveLength(3);
+  });
+
+  it('allows several browsers per user only in a concurrent run', async () => {
+    const app = withAccounts(true);
+    const res = await start(app, { caseIds: ['TC-1'], accountIds: ['a1'], browsersPerUser: 2 });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe('browsers-per-user-needs-concurrent');
+    expect(jobs).toEqual([]);
+  });
+
   it('asks for an account when sign-in is required, and does not guess one', async () => {
     const app = withAccounts(true);
     for (const body of [{ caseIds: ['TC-1'] }, { caseIds: ['TC-1'], accountIds: [] }]) {

@@ -2,6 +2,86 @@
 
 ## Unreleased
 
+### Step setup a tester can read: steps as sentences, parameters as chips — 2026-11-16
+
+- **Test case popup opens full screen,** so every step, label and box shows in full. The header button still gives the
+  smaller popup back; phones were already full screen.
+- **Test Case Studio and Test Execution:** a case opens from its row menu (**⋯ › Edit steps**, or **View steps** in Test
+  Execution). The ID is now plain text instead of a link that did not say what it opened.
+- **Project settings › New custom step / Edit opens full screen,** with three numbered sections in order: **Name and
+  description**, **What test cases fill in** and **Steps it runs**. Each input is a small card with visible labels
+  ("Label shown to testers", "Name used in steps", "Type of value"), and a new input takes focus. On wide screens the
+  preview and a **Ready to save?** list sit beside the form, under it on phones. The footer says what is still missing
+  (for example "To save: add at least one step.") instead of only greying out Save. The two headings that both read
+  "What does it do?" are now "Description" and "Steps it runs".
+- **Test Execution gives the page to the list:** the **Recent runs** panel is gone (Run History has every run), and so
+  are the **Concurrent run** and **Run all shown** buttons. Tick cases and use the bar that appears (Run, Concurrent run,
+  Auto-fill parameters). Filters sit in one slim row: result chips, a **Search** button that opens the search box (and
+  folds away when left empty), and the suite. Rows are compact (one line per case where it fits), so about ten or more
+  cases show without scrolling on a 1080p screen. A run in progress shows as one slim line.
+- **Run detail is a live view:** a ring with the share of cases finished, a pulsing **Live** badge and a ticking elapsed
+  clock, one bar split by result (running stripes move), and a tile per result (Passed, Failed, Blocked, Running,
+  Queued), all said in words as well as colour. Cases can be filtered by result; a running case shows its own clock and a
+  moving accent, and its steps show as a numbered timeline. Cancel, reports and **Explain with AI** are unchanged.
+- **A visible test browser opens as a full window:** Chromium starts maximized and pages use the window's real size
+  (also for manual sign-in). Headless runs keep their fixed viewport, so screenshots do not change.
+- **Tables re-fit their rows** when something above them goes away (such as a finished run's live strip), not only when
+  the window is resized.
+- **AI Assistant › Generate test cases, redesigned around one prompt box:** you type in one box with the example chips
+  ("Try: …", now saying what they are about) and **Generate test cases** on its bottom edge, ringed when focused. The
+  request's settings (skills, where to save, write steps) sit in one row under it. Once proposals arrive the box shrinks
+  to two lines, the examples step aside and the button reads **Generate again**, so the proposals start right below it;
+  if they are out of view the page scrolls to them. The count and **Save selected** stay pinned above the cards, a long
+  proposal title wraps over two lines instead of being cut off, and a "Writing test cases…" state shows while the AI
+  works. The same panel in Test Case Studio's "Create cases" dialog gets the same design.
+- **The footer Close asks before dropping unsaved changes,** like ✕ and Escape already did. Any dialog footer button
+  marked `data-dialog-close` now closes the same way.
+- **A step card reads in order:** "What should this step do?" first, then its fields in two roomy columns (one on phones),
+  then **What this step does**, the step in plain words. Values are highlighted, parameters show as chips with their
+  current value, and a required value that is still empty reads "Role missing". Problems, notes and "Changes data" are
+  badges in words. These cards are also used in Project settings › Custom steps.
+- **Show or hide a step's details** with **Details**, or all at once with **Hide all details**. A hidden step shows its
+  plain-words sentence, so the list reads like the whole test. Problems stay visible on a hidden step.
+- **Move a step with ↑ ↓ on the card.** Focus stays on the button used, at the step's new place; a new or duplicated step
+  gets focus on its action.
+- **Use parameter** replaces the `{ }` drop-down. Each text box keeps its full width, with a small **Use parameter**
+  action under it. It opens a searchable list of the case's parameters with their values, lined up under the field and
+  scrolled into view (a bottom sheet on phones). The list works with the keyboard (arrows, Enter, Escape) and can create
+  a new parameter by name instead of a browser prompt. A value that is just one parameter shows as a chip with
+  **Change parameter** and ✕ (type a value instead). Text mixed with parameters keeps the text box, inserts at the cursor
+  and previews the result under it.
+- **Stored steps are unchanged:** parameters are still saved as `{{data.name}}` (and `{{input.name}}` in custom steps).
+  No API change.
+
+### Choose how test cases run: fresh window, same window or concurrent users — 2026-11-16
+
+- **Start a run › How to run:** three choices replace the "Concurrent users" checkbox.
+  - **Fresh window for each test case (recommended, the default):** signs in once per user, then opens every case in a
+    new, signed-in window of one browser. Nothing else carries over between cases.
+  - **Same window for all test cases:** signs in once per user and runs the cases in the same window, one after another.
+    This is the fastest choice, but what one case leaves behind can affect the next.
+  - **Concurrent users:** a separate browser for each case and user, each signing in, all at once. You now tick who signs
+    in (nobody is ticked for you, unless a project has only one account) and choose **who signs in**:
+    - **Different users:** each ticked user in their own browser at the same time, as before.
+    - **Same user in several browsers:** each ticked user signs in to 2–8 browsers at once, and every case runs in each
+      of them at the same time, for example to check a double submit from two sessions. Results and evidence are
+      labelled "(browser 1)", "(browser 2)" and so on.
+    - Outside this choice, one account still never runs in two browsers at once. If a sign-in fails, that account's
+      other browsers don't try again.
+- **Fewer sign-ins:** before, every case opened its own browser and signed in again. In the first two modes a user signs in
+  once per run. If a reused sign-in no longer works (it expired, or a case signed out), the case signs in again by itself.
+  Evidence (screenshots, traces, page text) is still kept per case, and sign-in still happens before tracing starts.
+- **Start a run layout:** the dialog is wider, with two columns: who signs in on the left, how to run on the right. So the
+  whole choice fits without scrolling. On a phone it is full screen in one column.
+  - "Same window for all test cases" is shown but can't be picked for a single test case, and is labelled "Needs 2+ test
+    cases".
+  - "Windows at once" is asked only when there is more than one run to spread.
+- **Many test accounts:** each project shows "N of M chosen". With two or more accounts it adds **Select all** and
+  **Clear**. From seven accounts it adds a search box, and its list becomes a two-column grid that scrolls on its own. While
+  searching, **Select shown** ticks only the matching users.
+- **Worker API:** `POST /api/runs` accepts an optional `mode` (`clean` | `shared` | `concurrent`), which defaults to
+  `clean`, and an optional `browsersPerUser` (1–8, `concurrent` only).
+
 ### Skills dialog says why Save skill is off — 2026-11-13
 
 - **AI Assistant › Skills:** the Description and Instructions hints now give their minimums (3 and 10 characters, the server's

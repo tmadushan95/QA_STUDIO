@@ -1,0 +1,131 @@
+/* Start a run: who signs in on the left, how to run on the right; one column on narrow screens. */
+.layout {
+  display: grid;
+  gap: var(--space-5);
+}
+@media (min-width: 48rem) {
+  .layout {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+}
+.column {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* One project's cases and its accounts. */
+.project {
+  display: grid;
+  gap: var(--space-2);
+}
+.projectMeta {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.accounts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.accountsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-weight: var(--weight-semibold);
+}
+.count {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+}
+.accountTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.accountTools > :first-child:not(button) {
+  flex: 1 1 12rem;
+}
+.accountList {
+  display: grid;
+  gap: var(--space-2);
+}
+/* Many accounts: two columns where there is room, and the list (not the dialog) scrolls past a dozen or so. */
+.accountListMany {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+/* How to run: whole cards to press (like the sign-in method in Projects), stacked so each description reads in full. */
+.modes {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.modes legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-weight: var(--weight-semibold);
+}
+.mode {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.mode:hover {
+  background: var(--color-hover);
+}
+.mode:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.modeOn {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+/* A choice that does not apply to this run: still readable, clearly not pressable. */
+.modeDisabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.modeDisabled:hover {
+  background: none;
+}
+.mode input {
+  margin-top: 4px;
+  accent-color: var(--color-primary);
+}
+.modeTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+}
+.modeHint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+}

@@ -2,7 +2,10 @@
  * GenerateCasesPanel: describe what to test → review the proposed test cases as cards → save the chosen ones →
  * the AI writes their runnable steps, with each card showing how that went.
  *
- * - The prompt comes first; proposals appear below as a responsive card grid, each editable before saving.
+ * - The prompt comes first, as one box with the examples and Generate on its bottom edge; the request's settings
+ *   (skills, where to save, write steps) sit in one row under it. Once proposals arrive the box shrinks and the panel
+ *   scrolls to them if they are out of view. Proposals are a responsive card grid, each editable before saving, under a
+ *   bar that keeps "Save selected" in reach.
  * - Nothing is stored until "Save selected": trying prompts never fills the database.
  * - Saved cases are filed under the given target (project › version › suite) and, unless switched off, the AI writes
  *   their steps from the platform's step catalog and the project's page names. A case it can only partly automate
@@ -13,7 +16,7 @@
  *
  * Used on the AI Assistant page (with its own "save to" choice) and on Test Case Studio (with the page's work context).
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -24,7 +27,6 @@ import {
   Icon,
   StatusBadge,
   TextArea,
-  TextInput,
   useToast,
 } from '../../../design-system/index.js';
 import { errorMessage } from '../../../shared/api/http.js';
@@ -73,10 +75,20 @@ export interface GenerateCasesPanelProps {
   onSaved?: (ids: string[]) => void;
 }
 
+/** Example prompts, with the short label their chip shows. */
 const EXAMPLES = [
-  'Sign in with a valid and an invalid password, and reset a forgotten password.',
-  'Create, edit and delete a draft project, checking the list after each change.',
-  'Approve and reject a request as an approver, and check a viewer cannot approve.',
+  {
+    label: 'Sign in and reset a password',
+    text: 'Sign in with a valid and an invalid password, and reset a forgotten password.',
+  },
+  {
+    label: 'Create, edit and delete a draft',
+    text: 'Create, edit and delete a draft project, checking the list after each change.',
+  },
+  {
+    label: 'Approve and reject as an approver',
+    text: 'Approve and reject a request as an approver, and check a viewer cannot approve.',
+  },
 ];
 
 /** A saved proposal and the AI's step-writing result for it, once known. */
@@ -110,6 +122,17 @@ export function GenerateCasesPanel({
   useLive((e) => e.type === 'job' && jobs.reload());
   const job: DraftJob | undefined = jobs.data?.find((j) => j.id === jobId);
   const resultOf = useMemo(() => new Map((job?.results ?? []).map((r) => [r.caseId, r])), [job]);
+  // When the results stack under the prompt (narrow screens), bring new proposals into view instead of leaving them
+  // below the fold. Side by side they are already in view, so nothing moves.
+  const output = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = output.current;
+    if (!el || proposals.length === 0) return;
+    if (el.getBoundingClientRect().top > window.innerHeight * 0.6) {
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView?.({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+    }
+  }, [proposals.length > 0]);
 
   // Voice: the same flow as typing a description and pressing the buttons, so what voice does is on screen.
   useVoiceAction({
@@ -245,6 +268,8 @@ export function GenerateCasesPanel({
       text.split(/\s+/).includes(`/${name}`) ? text : `/${name} ${text.trimStart()}`,
     );
   const savedSkills = skills.data ?? [];
+  /** With proposals on screen the prompt box shrinks, so they start right below it. */
+  const compact = proposals.length > 0;
 
   const edit = (i: number, patch: Partial<ProposedCase>) =>
     setProposals((list) => list.map((p, n) => (n === i ? { ...p, ...patch } : p)));
@@ -256,224 +281,265 @@ export function GenerateCasesPanel({
 
   return (
     <div className={styles.panel}>
-      {/* 1. The prompt, first. */}
-      <section className={styles.composer} aria-label="Describe what to test">
-        <Field
-          label="What should be tested?"
-          hint="Describe a feature or flow in a sentence or two. The AI writes test cases a browser can run, using your app's page names. Type /skill-name to apply a saved skill."
+      <div className={styles.workspace}>
+        {/* 1. The prompt, first: one box to type in, with examples and Generate on its bottom edge. Once there are
+            proposals it shrinks and the examples step aside, so the proposals start right below it. */}
+        <section
+          className={styles.composer}
+          data-compact={compact || undefined}
+          aria-label="Describe what to test"
         >
-          {(p) => (
-            <TextArea
-              {...p}
-              rows={4}
-              value={prompt}
-              maxLength={4000}
-              placeholder={EXAMPLES[0]}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && prompt.trim().length >= 10)
-                  void propose();
-              }}
-            />
-          )}
-        </Field>
-        <div className={styles.examples} aria-label="Examples">
-          {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" className={styles.chip} onClick={() => setPrompt(ex)}>
-              <Icon name="sparkle" size={12} /> {ex.split(',')[0]}
-            </button>
-          ))}
-        </div>
-        {!skills.error && (
-          <div className={styles.skills} aria-label="Skills">
-            <span className={styles.sub}>Skills:</span>
-            {savedSkills.map((s) => (
-              <button
-                key={s.name}
-                type="button"
-                className={styles.chip}
-                title={s.description}
-                aria-label={`Use skill /${s.name}: ${s.description}`}
-                onClick={() => insertSkill(s.name)}
-              >
-                /{s.name}
-              </button>
-            ))}
-            <Button size="sm" variant="ghost" icon="settings" onClick={() => setManaging(true)}>
-              {savedSkills.length === 0 ? 'Save a skill' : 'Manage skills'}
-            </Button>
-          </div>
-        )}
-        {targetControls}
-        <div className={styles.composerFoot}>
-          <Checkbox
-            label="Write runnable steps after saving"
-            hint="The AI turns each saved case into steps from the step catalog; you review them before they run."
-            checked={writeSteps}
-            onChange={(e) => setWriteSteps(e.target.checked)}
-          />
-          <Button
-            variant="primary"
-            icon="sparkle"
-            loading={busy === 'propose'}
-            disabled={prompt.trim().length < 10}
-            onClick={() => void propose()}
+          <Field
+            label="What should be tested?"
+            hint="Describe a feature or flow in a sentence or two, using your app's page names. Type /skill-name to apply a saved skill. Ctrl+Enter generates."
           >
-            Generate test cases
-          </Button>
-        </div>
-      </section>
-
-      {error && <Alert tone="warning">{error}</Alert>}
-      {usage && usage.unknown.length > 0 && proposals.length > 0 && (
-        <Alert tone="info">
-          {usage.unknown.map((n) => `/${n}`).join(', ')}{' '}
-          {usage.unknown.length === 1
-            ? 'is not a saved skill, so it was'
-            : 'are not saved skills, so they were'}{' '}
-          read as plain text.
-        </Alert>
-      )}
-
-      {/* 2. Proposals as cards. */}
-      {proposals.length > 0 && (
-        <section aria-label="Proposed test cases" className={styles.results}>
-          <div className={styles.resultsHead}>
-            <div>
-              <h3 className={styles.resultsTitle}>
-                {plural(proposals.length, 'proposed test case')} · {chosen.size} selected
-              </h3>
-              <p className={styles.sub}>Not saved yet. They will be filed under {targetLabel}.</p>
-              {usage && usage.applied.length > 0 && (
-                <p className={styles.sub}>
-                  Skills applied:{' '}
-                  {usage.applied.map((n) => (
-                    <Badge key={n} tone="info">
-                      /{n}
-                    </Badge>
-                  ))}
-                </p>
-              )}
-            </div>
-            <div className={styles.actions}>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() =>
-                  setChosen(
-                    chosen.size === proposals.length
-                      ? new Set()
-                      : new Set(proposals.map((_, i) => i)),
-                  )
-                }
-              >
-                {chosen.size === proposals.length ? 'Select none' : 'Select all'}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setProposals([])}>
-                Discard
-              </Button>
-              <Button
-                variant="primary"
-                icon="check"
-                loading={busy === 'save'}
-                disabled={chosen.size === 0}
-                onClick={() => void save()}
-              >
-                Save selected ({chosen.size})
-              </Button>
-            </div>
-          </div>
-          <ul className={styles.grid}>
-            {proposals.map((p, i) => (
-              <li
-                key={i}
-                className={chosen.has(i) ? `${styles.card} ${styles.picked}` : styles.card}
-              >
-                <div className={styles.cardHead}>
-                  <Checkbox
-                    aria-label={`Keep "${p.title}"`}
-                    checked={chosen.has(i)}
-                    onChange={() => toggle(i)}
-                  />
-                  <span className={styles.cardNo}>#{i + 1}</span>
-                  {p.priority && (
-                    <Badge
-                      tone={
-                        p.priority === 'High'
-                          ? 'danger'
-                          : p.priority === 'Medium'
-                            ? 'warning'
-                            : 'neutral'
-                      }
-                    >
-                      {p.priority}
-                    </Badge>
-                  )}
-                  {p.module && <span className={styles.sub}>{p.module}</span>}
-                </div>
-                <TextInput
-                  aria-label={`Title of proposal ${i + 1}`}
-                  value={p.title}
-                  onChange={(e) => edit(i, { title: e.target.value })}
+            {(p) => (
+              <div className={styles.promptBox}>
+                <TextArea
+                  {...p}
+                  className={styles.promptInput}
+                  rows={compact ? 2 : 4}
+                  value={prompt}
+                  maxLength={4000}
+                  placeholder={EXAMPLES[0]!.text}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && prompt.trim().length >= 10)
+                      void propose();
+                  }}
                 />
-                {p.preconditions && <p className={styles.sub}>Before: {p.preconditions}</p>}
-                <ol className={styles.steps}>
-                  {p.steps.map((s, n) => (
-                    <li key={n}>{s}</li>
-                  ))}
-                </ol>
-                <p className={styles.expected}>
-                  <Icon name="check" size={14} /> {p.expectedResult}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* 3. What happened to the saved cases. */}
-      {saved.length > 0 && proposals.length === 0 && (
-        <section aria-label="Saved test cases" className={styles.results}>
-          <div className={styles.resultsHead}>
-            <div>
-              <h3 className={styles.resultsTitle}>Saved {plural(saved.length, 'test case')}</h3>
-              <p className={styles.sub}>
-                {jobId
-                  ? job?.status === 'running'
-                    ? `Writing steps… ${job.done} of ${job.total}`
-                    : 'Steps written. Review and mark them ready on Test Case Studio.'
-                  : 'Write their steps from Test Case Studio when you are ready.'}
-              </p>
-            </div>
-            <a className="button-link" href={href('design')}>
-              Review on Test Case Studio
-            </a>
+                <div className={styles.promptBar}>
+                  {!compact && (
+                    <div className={styles.examples} aria-label="Examples">
+                      <span className={styles.sub}>Try:</span>
+                      {EXAMPLES.map((ex) => (
+                        <button
+                          key={ex.label}
+                          type="button"
+                          className={styles.chip}
+                          title={ex.text}
+                          onClick={() => setPrompt(ex.text)}
+                        >
+                          <Icon name="sparkle" size={12} /> {ex.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <Button
+                    variant="primary"
+                    icon="sparkle"
+                    className={styles.generate}
+                    loading={busy === 'propose'}
+                    disabled={prompt.trim().length < 10}
+                    onClick={() => void propose()}
+                  >
+                    {compact ? 'Generate again' : 'Generate test cases'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Field>
+          {/* Settings for this request, in one quiet row. */}
+          <div className={styles.options}>
+            {!skills.error && (
+              <div className={styles.skills} aria-label="Skills">
+                <span className={styles.sub}>Skills:</span>
+                {savedSkills.map((s) => (
+                  <button
+                    key={s.name}
+                    type="button"
+                    className={styles.chip}
+                    title={s.description}
+                    aria-label={`Use skill /${s.name}: ${s.description}`}
+                    onClick={() => insertSkill(s.name)}
+                  >
+                    /{s.name}
+                  </button>
+                ))}
+                <Button size="sm" variant="ghost" icon="settings" onClick={() => setManaging(true)}>
+                  {savedSkills.length === 0 ? 'Save a skill' : 'Manage skills'}
+                </Button>
+              </div>
+            )}
+            {targetControls}
+            <Checkbox
+              label="Write runnable steps after saving"
+              hint="The AI turns each saved case into steps from the step catalog; you review them before they run."
+              checked={writeSteps}
+              onChange={(e) => setWriteSteps(e.target.checked)}
+            />
           </div>
-          <ul className={styles.grid}>
-            {saved.map((s) => {
-              const r = resultOf.get(s.id);
-              const o = r ? OUTCOME[r.outcome] : undefined;
-              return (
-                <li key={s.id} className={styles.card}>
-                  <div className={styles.cardHead}>
-                    <code>{s.id}</code>
-                    {o ? (
-                      <StatusBadge status={o.status} label={o.label} />
-                    ) : jobId ? (
-                      <StatusBadge status="running" label="Writing steps" />
-                    ) : (
-                      <StatusBadge status="none" label="No steps yet" />
-                    )}
-                  </div>
-                  <strong>{s.title}</strong>
-                  {r?.message && <p className={styles.sub}>{r.message}</p>}
-                  {o?.hint && <p className={styles.hint}>{o.hint}</p>}
-                </li>
-              );
-            })}
-          </ul>
         </section>
-      )}
+
+        <div ref={output} className={styles.output}>
+          {error && <Alert tone="warning">{error}</Alert>}
+          {usage && usage.unknown.length > 0 && proposals.length > 0 && (
+            <Alert tone="info">
+              {usage.unknown.map((n) => `/${n}`).join(', ')}{' '}
+              {usage.unknown.length === 1
+                ? 'is not a saved skill, so it was'
+                : 'are not saved skills, so they were'}{' '}
+              read as plain text.
+            </Alert>
+          )}
+
+          {/* 2. Proposals as cards. */}
+          {proposals.length > 0 && (
+            <section aria-label="Proposed test cases" className={styles.results}>
+              <div className={styles.resultsHead}>
+                <div>
+                  <h3 className={styles.resultsTitle}>
+                    {plural(proposals.length, 'proposed test case')} · {chosen.size} selected
+                  </h3>
+                  <p className={styles.sub}>
+                    Not saved yet. They will be filed under {targetLabel}.
+                  </p>
+                  {usage && usage.applied.length > 0 && (
+                    <p className={styles.sub}>
+                      Skills applied:{' '}
+                      {usage.applied.map((n) => (
+                        <Badge key={n} tone="info">
+                          /{n}
+                        </Badge>
+                      ))}
+                    </p>
+                  )}
+                </div>
+                <div className={styles.actions}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      setChosen(
+                        chosen.size === proposals.length
+                          ? new Set()
+                          : new Set(proposals.map((_, i) => i)),
+                      )
+                    }
+                  >
+                    {chosen.size === proposals.length ? 'Select none' : 'Select all'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setProposals([])}>
+                    Discard
+                  </Button>
+                  <Button
+                    variant="primary"
+                    icon="check"
+                    loading={busy === 'save'}
+                    disabled={chosen.size === 0}
+                    onClick={() => void save()}
+                  >
+                    Save selected ({chosen.size})
+                  </Button>
+                </div>
+              </div>
+              <ul className={styles.grid}>
+                {proposals.map((p, i) => (
+                  <li
+                    key={i}
+                    className={chosen.has(i) ? `${styles.card} ${styles.picked}` : styles.card}
+                  >
+                    <div className={styles.cardHead}>
+                      <Checkbox
+                        aria-label={`Keep "${p.title}"`}
+                        checked={chosen.has(i)}
+                        onChange={() => toggle(i)}
+                      />
+                      <span className={styles.cardNo}>#{i + 1}</span>
+                      {p.priority && (
+                        <Badge
+                          tone={
+                            p.priority === 'High'
+                              ? 'danger'
+                              : p.priority === 'Medium'
+                                ? 'warning'
+                                : 'neutral'
+                          }
+                        >
+                          {p.priority}
+                        </Badge>
+                      )}
+                      {p.module && <span className={styles.sub}>{p.module}</span>}
+                    </div>
+                    {/* Two lines, so a long title shows in full; a title stays one line when saved. */}
+                    <TextArea
+                      aria-label={`Title of proposal ${i + 1}`}
+                      className={styles.titleBox}
+                      rows={2}
+                      value={p.title}
+                      onChange={(e) => edit(i, { title: e.target.value.replace(/\s*\n\s*/g, ' ') })}
+                    />
+                    {p.preconditions && <p className={styles.sub}>Before: {p.preconditions}</p>}
+                    <ol className={styles.steps}>
+                      {p.steps.map((s, n) => (
+                        <li key={n}>{s}</li>
+                      ))}
+                    </ol>
+                    <p className={styles.expected}>
+                      <Icon name="check" size={14} /> {p.expectedResult}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* 3. What happened to the saved cases. */}
+          {saved.length > 0 && proposals.length === 0 && (
+            <section aria-label="Saved test cases" className={styles.results}>
+              <div className={styles.resultsHead}>
+                <div>
+                  <h3 className={styles.resultsTitle}>Saved {plural(saved.length, 'test case')}</h3>
+                  <p className={styles.sub}>
+                    {jobId
+                      ? job?.status === 'running'
+                        ? `Writing steps… ${job.done} of ${job.total}`
+                        : 'Steps written. Review and mark them ready on Test Case Studio.'
+                      : 'Write their steps from Test Case Studio when you are ready.'}
+                  </p>
+                </div>
+                <a className="button-link" href={href('design')}>
+                  Review on Test Case Studio
+                </a>
+              </div>
+              <ul className={styles.grid}>
+                {saved.map((s) => {
+                  const r = resultOf.get(s.id);
+                  const o = r ? OUTCOME[r.outcome] : undefined;
+                  return (
+                    <li key={s.id} className={styles.card}>
+                      <div className={styles.cardHead}>
+                        <code>{s.id}</code>
+                        {o ? (
+                          <StatusBadge status={o.status} label={o.label} />
+                        ) : jobId ? (
+                          <StatusBadge status="running" label="Writing steps" />
+                        ) : (
+                          <StatusBadge status="none" label="No steps yet" />
+                        )}
+                      </div>
+                      <strong>{s.title}</strong>
+                      {r?.message && <p className={styles.sub}>{r.message}</p>}
+                      {o?.hint && <p className={styles.hint}>{o.hint}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          {busy === 'propose' && proposals.length === 0 && (
+            <EmptyState icon="sparkle" title="Writing test cases…">
+              The AI is reading your description and the app's page names.
+            </EmptyState>
+          )}
+          {proposals.length === 0 && saved.length === 0 && !error && busy !== 'propose' && (
+            <EmptyState icon="sparkle" title="Proposed test cases appear here">
+              Review and edit them before saving. Only the ones you select are added.
+            </EmptyState>
+          )}
+        </div>
+      </div>
 
       {managing && (
         <SkillsDialog
@@ -481,12 +547,6 @@ export function GenerateCasesPanel({
           onClose={() => setManaging(false)}
           onChanged={skills.reload}
         />
-      )}
-
-      {proposals.length === 0 && saved.length === 0 && !error && busy !== 'propose' && (
-        <EmptyState icon="sparkle" title="Proposed test cases appear here">
-          Review and edit them before saving. Only the ones you select are added.
-        </EmptyState>
       )}
     </div>
   );

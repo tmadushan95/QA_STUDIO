@@ -4,8 +4,8 @@
  * - Sizes: `sm` (confirmations), `md` (short forms), `lg` (editors, wizards); full screen on phones.
  * - Sticky header and footer; only the body scrolls.
  * - Focus moves into the dialog, stays inside it, and returns to the opener when it closes.
- * - Escape, the ✕ button and the backdrop close it. With unsaved changes (`dirty`) closing asks first; that
- *   question is the only dialog ever shown on top of another.
+ * - Escape, the ✕ button and the backdrop close it, and so does a footer button marked `data-dialog-close`. With
+ *   unsaved changes (`dirty`) closing asks first; that question is the only dialog ever shown on top of another.
  * - Ctrl/Cmd+S calls `onSave` when given.
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -20,7 +20,7 @@ export interface DialogProps {
   subtitle?: ReactNode;
   size?: 'sm' | 'md' | 'lg';
   onClose: () => void;
-  /** Content of the sticky footer, usually the buttons. */
+  /** Content of the sticky footer, usually the buttons. A button with `data-dialog-close` closes like ✕ does. */
   footer?: ReactNode;
   /** True while there are unsaved changes: closing then asks "Discard changes?". */
   dirty?: boolean;
@@ -132,7 +132,18 @@ export function Dialog({
           </div>
         </div>
         <div className={styles.body}>{children}</div>
-        {footer && <div className={styles.footer}>{footer}</div>}
+        {footer && (
+          // A footer "Close" goes through the same path as ✕, so unsaved changes are never dropped without asking.
+          <div
+            className={styles.footer}
+            onClick={(e) => {
+              const el = (e.target as Element).closest('[data-dialog-close]');
+              if (el && !(el as HTMLButtonElement).disabled) requestClose();
+            }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
       {askDiscard && (
         <ConfirmDialog

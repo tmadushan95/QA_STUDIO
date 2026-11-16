@@ -5,6 +5,7 @@ import {
   type ExecutionStatus,
   type Failure,
   type Run,
+  type RunMode,
   type RunSummary,
   type Scenario,
   type SourceRef,
@@ -23,6 +24,12 @@ export interface CaseJob {
   projectId?: number | undefined;
   /** Account to sign in as. A case selected for several accounts becomes one job per account. */
   account?: AccountRef | undefined;
+  /**
+   * Which of several browsers the account runs in, when a concurrent run signs one account in more than once at the
+   * same time ("same user in several browsers"). Each browser is its own sign-in: different browsers of one account run
+   * side by side, but within one browser the account still runs one case at a time. Absent means the only one.
+   */
+  session?: number | undefined;
   title?: string | undefined;
   module?: string | undefined;
   priority?: string | undefined;
@@ -44,13 +51,20 @@ export interface CaseOutcome {
 }
 
 export interface CaseExecutor {
-  execute(job: CaseJob, ctx: { runId: string; signal: AbortSignal }): Promise<CaseOutcome>;
+  execute(
+    job: CaseJob,
+    ctx: { runId: string; signal: AbortSignal; mode?: RunMode },
+  ): Promise<CaseOutcome>;
+  /** Called once when a run ends (however it ends), so anything kept open for the run can be released. */
+  endRun?(runId: string): Promise<void>;
 }
 
 export interface RunOptions {
   environment: string;
   browser: string;
   workers: number;
+  /** How cases share browsers and sign-ins. Defaults to `clean`. */
+  mode?: RunMode | undefined;
 }
 
 export interface RunManagerOptions {
@@ -71,6 +85,7 @@ interface Internal {
   jobs: CaseJob[];
   abort: AbortController;
   done: Promise<Run>;
+  mode: RunMode;
 }
 
 const NO_SCENARIO: Failure = {
@@ -152,6 +167,7 @@ export class RunManager {
         jobs: [],
         abort: new AbortController(),
         done: Promise.resolve(run),
+        mode: 'clean',
       });
     }
     this.trim();
@@ -179,7 +195,13 @@ export class RunManager {
       })),
     };
     const abort = new AbortController();
-    const entry: Internal = { run, jobs, abort, done: Promise.resolve(run) };
+    const entry: Internal = {
+      run,
+      jobs,
+      abort,
+      done: Promise.resolve(run),
+      mode: opts.mode ?? 'clean',
+    };
     const p = this.tail.then(() => this.execute(entry));
     this.tail = p.catch(() => undefined);
     entry.done = p;
@@ -222,7 +244,7 @@ export class RunManager {
   }
 
   private async execute(e: Internal): Promise<Run> {
-    const { run, jobs, abort } = e;
+    const { run, jobs, abort, mode } = e;
     const cancelRemaining = () => {
       for (const c of run.cases) if (c.status === 'queued') c.status = 'cancelled';
     };
@@ -238,9 +260,12 @@ export class RunManager {
     this.notify(run);
 
     // Jobs wait in a queue. A job is picked only when its account is not already signed in elsewhere in this
-    // run, so one account never has two browsers open at once (SSO limits and lock-outs make that risky).
+    // run, so one account never has two browsers open at once (SSO limits and lock-outs make that risky). The one
+    // exception is asked for explicitly: a concurrent run of the same user in several browsers gives each browser its
+    // own `session`, and only the same account in the same session waits.
     const pending = jobs.map((job, i) => ({ job, result: run.cases[i]! }));
     const busy = new Set<string>();
+    const busyKey = (job: CaseJob) => job.account && `${job.account.id}#${job.session ?? 1}`;
     let waiters: (() => void)[] = [];
     const wakeAll = () => {
       const w = waiters;
@@ -252,17 +277,20 @@ export class RunManager {
     const worker = async () => {
       for (;;) {
         if (abort.signal.aborted) return;
-        const at = pending.findIndex((p) => !p.job.account || !busy.has(p.job.account.id));
+        const at = pending.findIndex((p) => {
+          const key = busyKey(p.job);
+          return !key || !busy.has(key);
+        });
         if (at === -1) {
           if (pending.length === 0) return;
           await new Promise<void>((resolve) => waiters.push(resolve)); // every remaining job's account is busy
           continue;
         }
         const [next] = pending.splice(at, 1);
-        const accountId = next!.job.account?.id;
+        const accountId = busyKey(next!.job);
         if (accountId) busy.add(accountId);
         try {
-          await this.runCase(run.id, next!.job, next!.result, abort.signal);
+          await this.runCase(run.id, mode, next!.job, next!.result, abort.signal);
           this.notify(run);
         } finally {
           if (accountId) busy.delete(accountId);
@@ -270,7 +298,12 @@ export class RunManager {
         }
       }
     };
-    await Promise.all(Array.from({ length: Math.min(run.workers, jobs.length) }, worker));
+    try {
+      await Promise.all(Array.from({ length: Math.min(run.workers, jobs.length) }, worker));
+    } finally {
+      // Browsers kept open for the run are closed even if a worker threw. A failure here never changes the result.
+      await this.executor.endRun?.(run.id).catch((err: unknown) => this.onError?.(err));
+    }
 
     cancelRemaining();
     const { counts } = summarizeRun(run);
@@ -287,6 +320,7 @@ export class RunManager {
 
   private async runCase(
     runId: string,
+    mode: RunMode,
     job: CaseJob,
     result: CaseResult,
     signal: AbortSignal,
@@ -298,7 +332,7 @@ export class RunManager {
       if (!job.scenario) {
         Object.assign(result, { status: 'blocked', failure: NO_SCENARIO });
       } else {
-        const o = await this.executor.execute(job, { runId, signal });
+        const o = await this.executor.execute(job, { runId, signal, mode });
         Object.assign(result, {
           status: o.status,
           steps: o.steps,

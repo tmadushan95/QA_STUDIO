@@ -221,15 +221,8 @@ export function TestCaseStudioPage() {
       header: 'ID',
       rowHeader: true,
       shrink: true,
-      cell: (r) => (
-        <button
-          type="button"
-          className={list.idLink}
-          onClick={() => setEditing({ tc: r.tc, tab: 'steps' })}
-        >
-          {r.tc.id}
-        </button>
-      ),
+      // A case opens from its row menu ("Edit steps"), so the ID is plain text.
+      cell: (r) => <span className={list.caseId}>{r.tc.id}</span>,
     },
     { key: 'title', header: 'Title', cell: (r) => <CaseTitle row={r} /> },
     {

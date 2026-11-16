@@ -1,0 +1,225 @@
+/*
+ * Parameters in step fields: chips instead of {{…}} syntax, the field that holds them (a full-width box with a small
+ * "Use parameter" action under it) and the list it opens (under the field on wide screens, a bottom sheet on phones).
+ */
+
+/* A parameter as a chip: icon, name, then its current value after a divider. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: 0.0625rem var(--space-2);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-soft);
+  color: var(--color-primary-hover);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+.chip svg {
+  flex: none;
+}
+.chipName {
+  flex: 0 1 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* In a narrow place the value gives way long before the name does. */
+.chipValue {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: var(--space-1);
+  border-left: 1px solid var(--color-primary-border);
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-regular);
+  text-overflow: ellipsis;
+}
+.noValue {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* The field: the box at full width, then the preview and the parameter action under it. The list is placed against
+   the field, so it lines up with the box and never runs out of the card. */
+.valueField {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.valueField > input,
+.valueField > .chipField {
+  align-self: stretch;
+}
+.preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.previewLabel {
+  color: var(--color-text-muted);
+}
+
+/* A value that is just one parameter: the chip sits where the text would be, inside a box shaped like an input. */
+.chipField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: 0 0 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.chipSlot {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.clear {
+  flex: none;
+  width: calc(var(--control-height) - 2px);
+  min-height: calc(var(--control-height) - 2px);
+}
+
+/* The picker: a small link-like action under the box. Its wrapper adds no box, so the list is placed against the
+   field. */
+.picker {
+  display: contents;
+}
+.trigger {
+  margin-left: calc(-1 * var(--space-2));
+  color: var(--color-primary-hover);
+  white-space: nowrap;
+}
+.backdrop {
+  display: none;
+}
+.panel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: max(100%, 18rem);
+  max-width: min(26rem, calc(100vw - 2rem));
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+.options {
+  display: flex;
+  flex-direction: column;
+  max-height: 14rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 2.25rem;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+/* The highlighted option also gets a left bar, so it does not rely on colour alone. */
+.option[aria-selected='true'] {
+  background: var(--color-hover);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+.optionName {
+  overflow: hidden;
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.optionValue {
+  overflow: hidden;
+  max-width: 50%;
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.create {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-primary-hover);
+  font-weight: var(--weight-medium);
+}
+.empty {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.footnote {
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+/* Phones: the list opens as a bottom sheet with large rows. */
+@media (max-width: 47.5rem) {
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    display: block;
+    background: rgb(11 19 36 / 0.35);
+  }
+  .panel {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    max-width: none;
+    max-height: 75vh;
+    padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--shadow-lg);
+  }
+  .options {
+    max-height: none;
+    flex: 1;
+  }
+  .option {
+    min-height: 2.75rem;
+    align-items: center;
+  }
+}

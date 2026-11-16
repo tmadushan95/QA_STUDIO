@@ -55,16 +55,16 @@ const CASE_POINTS: Point[] = [
     title: 'Use parameters for values that change',
     text: (
       <>
-        Press <code>{'{ }'}</code> next to a text box to insert a value such as{' '}
-        <code>{'{{data.projectCode}}'}</code>. Set its value on the <strong>Parameters</strong> tab,
-        for this case or for the whole project.
+        Press <strong>Use parameter</strong> next to a text box and pick one, such as{' '}
+        <em>projectCode</em>. It shows as a chip with its current value. Set the value on the{' '}
+        <strong>Parameters</strong> tab, for this case or for the whole project.
       </>
     ),
   },
   {
     icon: 'check',
     title: 'Check steps decide pass or fail',
-    text: 'A “Check” step (text is shown, value equals, number of rows) fails the test when the application does not match. The sentence under each step says what it checks.',
+    text: 'A “Check” step (text is shown, value equals, number of rows) fails the test when the application does not match. The sentence at the top of each step says what it checks.',
   },
 ];
 
@@ -79,8 +79,8 @@ const RECIPE_POINTS: Point[] = [
     title: '2. Steps: what it does',
     text: (
       <>
-        Build the recipe from the standard steps. Press <code>{'{ }'}</code> next to a text box to
-        use an input there; it is written <code>{'{{input.role}}'}</code>.
+        Build the recipe from the standard steps. Press <strong>Use input</strong> next to a text
+        box to use an input there; it shows as a chip with the input’s name.
       </>
     ),
   },
@@ -144,7 +144,7 @@ export function StepGuide({
               Go to page <em>Projects</em>
             </li>
             <li>Click button “New project”</li>
-            <li>Fill field “Code” with “{'{{data.projectCode}}'}”</li>
+            <li>Fill field “Code” with the parameter projectCode</li>
             <li>Check text “Project created” is shown</li>
           </ol>
           <p>

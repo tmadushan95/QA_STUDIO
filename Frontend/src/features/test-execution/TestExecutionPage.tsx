@@ -3,10 +3,13 @@
  *
  * Only cases marked ready on Test Case Studio are listed. Before a run, their parameters can be checked and filled
  * (by hand or automatically); a case missing a value would be blocked. A run can use one user, or several users at
- * once ("Concurrent users") to check what happens when people work in parallel. A live strip shows the run in
- * progress; full results are in Run History.
+ * once ("Concurrent users") to check what happens when people work in parallel: tick cases, then use the bar that
+ * appears. A live strip shows the run in progress; full results are in Run History.
+ *
+ * The list gets the page: filters sit in one slim row (search opens from a button) and rows are compact, so about ten
+ * cases show without scrolling.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -14,7 +17,6 @@ import {
   EmptyState,
   Menu,
   PageHeader,
-  Panel,
   ProgressBar,
   SearchBox,
   Select,
@@ -25,7 +27,7 @@ import {
 import { errorMessage } from '../../shared/api/http.js';
 import { useDebounced } from '../../shared/hooks/useAsync.js';
 import { href, navigate } from '../../shared/hooks/useRoute.js';
-import { formatDate, plural } from '../../shared/lib/format.js';
+import { plural } from '../../shared/lib/format.js';
 import { StartRunDialog } from '../runs/components/StartRunDialog.js';
 import { ACTIVE } from '../runs/api.js';
 import { autoConfigure, type TestCase } from '../test-cases/api.js';
@@ -41,11 +43,6 @@ import styles from './TestExecutionPage.module.css';
 type ResultFilter = '' | 'notRun' | 'passed' | 'failed' | 'missing';
 
 const PAGE_SIZE = 25;
-/** The most cases one run accepts (the server's limit). */
-const MAX_RUN = 500;
-
-const pct = (r: number | null | undefined) =>
-  r === null || r === undefined ? '—' : `${Math.round(r * 100)}%`;
 
 /** The Test Execution page. */
 export function TestExecutionPage() {
@@ -63,6 +60,13 @@ export function TestExecutionPage() {
   const [editing, setEditing] = useState<TestCase>();
   const [params, setParams] = useState<TestCase>();
   const [busy, setBusy] = useState(false);
+  /** The search box opens from its button and folds away again once it is left empty. */
+  const [searching, setSearching] = useState(false);
+  const searchWrap = useRef<HTMLDivElement>(null);
+  const searchOpen = searching || q !== '';
+  useEffect(() => {
+    if (searching) searchWrap.current?.querySelector('input')?.focus();
+  }, [searching]);
 
   const filter = { projectId: projectId, versionId: versionId, suiteId, query };
   const ready = useMemo(
@@ -81,7 +85,6 @@ export function TestExecutionPage() {
   const ids = [...selected];
 
   const active = lib.runs.find((r) => ACTIVE.includes(r.status));
-  const recent = [...lib.runs].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
   const missingCount = ready.filter((r) => r.missing.length > 0).length;
 
   const fill = async (list: string[]) => {
@@ -105,11 +108,8 @@ export function TestExecutionPage() {
       header: 'ID',
       rowHeader: true,
       shrink: true,
-      cell: (r) => (
-        <button type="button" className={list.idLink} onClick={() => setEditing(r.tc)}>
-          {r.tc.id}
-        </button>
-      ),
+      // A case opens from its row menu ("View steps"), so the ID is plain text.
+      cell: (r) => <span className={list.caseId}>{r.tc.id}</span>,
     },
     { key: 'title', header: 'Title', cell: (r) => <CaseTitle row={r} /> },
     { key: 'params', header: 'Parameters', shrink: true, cell: (r) => <ParamsCell row={r} /> },
@@ -155,32 +155,11 @@ export function TestExecutionPage() {
     },
   ];
 
-  const allIds = rows.map((r) => r.tc.id).slice(0, MAX_RUN);
-
   return (
     <div className={list.stack}>
       <PageHeader
         title="Test Execution"
-        description="Run the test cases that are ready, as one user or several at once, and follow the results live."
-        actions={
-          <>
-            <Button
-              icon="users"
-              disabled={allIds.length === 0}
-              onClick={() => setRunning({ ids: allIds, concurrent: true })}
-            >
-              Concurrent run
-            </Button>
-            <Button
-              variant="primary"
-              icon="play"
-              disabled={allIds.length === 0}
-              onClick={() => setRunning({ ids: allIds, concurrent: false })}
-            >
-              Run {allIds.length > 0 ? `all shown (${allIds.length})` : ''}
-            </Button>
-          </>
-        }
+        description="Run ready test cases and follow the results live. Tick cases to run several at once."
       />
 
       {active && (
@@ -205,127 +184,143 @@ export function TestExecutionPage() {
         </section>
       )}
 
-      <div className={styles.layout}>
-        <div className={list.stack}>
-          <Panel>
-            <div className={list.stack}>
-              <StatusFilter
-                label="Filter by last result"
-                active={result || 'all'}
-                onChange={(id) => {
-                  setResult(id === 'all' ? '' : (id as ResultFilter));
+      <div className={list.stack}>
+        <div className={styles.filters}>
+          <div className={styles.filterRow}>
+            <StatusFilter
+              label="Filter by last result"
+              active={result || 'all'}
+              onChange={(id) => {
+                setResult(id === 'all' ? '' : (id as ResultFilter));
+                setPage(1);
+              }}
+              chips={[
+                { id: 'all', label: 'All ready', count: ready.length },
+                {
+                  id: 'notRun',
+                  label: 'Not run yet',
+                  count: ready.filter((r) => !r.last).length,
+                  color: 'var(--color-text-muted)',
+                },
+                {
+                  id: 'passed',
+                  label: 'Passed',
+                  count: ready.filter((r) => lastStatus(r) === 'passed').length,
+                  color: 'var(--color-success)',
+                },
+                {
+                  id: 'failed',
+                  label: 'Failed or blocked',
+                  count: ready.filter(
+                    (r) => lastStatus(r) === 'failed' || lastStatus(r) === 'blocked',
+                  ).length,
+                  color: 'var(--color-danger)',
+                },
+                {
+                  id: 'missing',
+                  label: 'Missing parameters',
+                  count: missingCount,
+                  color: 'var(--color-warning)',
+                },
+              ]}
+            />
+            <div className={styles.toolbar}>
+              {/* In the same row as the filters, so it costs the list no height. */}
+              {missingCount > 0 && selected.size === 0 && (
+                <span className={styles.notice}>
+                  <span className={list.sub}>
+                    {plural(missingCount, 'case')} would be blocked by a missing parameter.
+                  </span>
+                  <Button
+                    size="sm"
+                    icon="sliders"
+                    loading={busy}
+                    onClick={() =>
+                      void fill(ready.filter((r) => r.missing.length > 0).map((r) => r.tc.id))
+                    }
+                  >
+                    Auto-fill parameters
+                  </Button>
+                </span>
+              )}
+              {searchOpen ? (
+                <div
+                  ref={searchWrap}
+                  className={styles.search}
+                  onBlur={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null) && q === '')
+                      setSearching(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' && q === '') setSearching(false);
+                  }}
+                >
+                  <SearchBox
+                    label="Search test cases"
+                    placeholder="Search by ID, title or module"
+                    value={q}
+                    onChange={(v) => {
+                      setQ(v);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+              ) : (
+                <Button icon="search" onClick={() => setSearching(true)}>
+                  Search
+                </Button>
+              )}
+              <Select
+                aria-label="Test suite"
+                className={styles.suite}
+                value={suiteId}
+                onChange={(e) => {
+                  setSuiteId(Number(e.target.value));
                   setPage(1);
                 }}
-                chips={[
-                  { id: 'all', label: 'All ready', count: ready.length },
-                  {
-                    id: 'notRun',
-                    label: 'Not run yet',
-                    count: ready.filter((r) => !r.last).length,
-                    color: 'var(--color-text-muted)',
-                  },
-                  {
-                    id: 'passed',
-                    label: 'Passed',
-                    count: ready.filter((r) => lastStatus(r) === 'passed').length,
-                    color: 'var(--color-success)',
-                  },
-                  {
-                    id: 'failed',
-                    label: 'Failed or blocked',
-                    count: ready.filter(
-                      (r) => lastStatus(r) === 'failed' || lastStatus(r) === 'blocked',
-                    ).length,
-                    color: 'var(--color-danger)',
-                  },
-                  {
-                    id: 'missing',
-                    label: 'Missing parameters',
-                    count: missingCount,
-                    color: 'var(--color-warning)',
-                  },
-                ]}
-              />
-              <div className={styles.toolbar}>
-                <SearchBox
-                  label="Search test cases"
-                  placeholder="Search by ID, title or module"
-                  value={q}
-                  onChange={(v) => {
-                    setQ(v);
-                    setPage(1);
-                  }}
-                />
-                <Select
-                  aria-label="Test suite"
-                  value={suiteId}
-                  onChange={(e) => {
-                    setSuiteId(Number(e.target.value));
-                    setPage(1);
-                  }}
-                >
-                  <option value={0}>All suites</option>
-                  {lib.suites
-                    .filter((x) => x.projectId === projectId)
-                    .map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.name}
-                      </option>
-                    ))}
-                </Select>
-              </div>
+              >
+                <option value={0}>All suites</option>
+                {lib.suites
+                  .filter((x) => x.projectId === projectId)
+                  .map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+              </Select>
             </div>
-            {missingCount > 0 && selected.size === 0 && (
-              <div className={list.toolbar}>
-                <span className={list.sub}>
-                  {plural(missingCount, 'case')} would be blocked by a missing parameter.
-                </span>
-                <Button
-                  size="sm"
-                  icon="sliders"
-                  loading={busy}
-                  onClick={() =>
-                    void fill(ready.filter((r) => r.missing.length > 0).map((r) => r.tc.id))
-                  }
-                >
-                  Auto-fill parameters
-                </Button>
-              </div>
-            )}
-            {selected.size > 0 && (
-              <div className={list.bulk} role="region" aria-label="Selected test cases">
-                <strong>{selected.size} selected</strong>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  icon="play"
-                  onClick={() => setRunning({ ids, concurrent: false })}
-                >
-                  Run {selected.size}
-                </Button>
-                <Button
-                  size="sm"
-                  icon="users"
-                  onClick={() => setRunning({ ids, concurrent: true })}
-                >
-                  Concurrent run
-                </Button>
-                <Button size="sm" icon="sliders" loading={busy} onClick={() => void fill(ids)}>
-                  Auto-fill parameters
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
-                  Clear selection
-                </Button>
-              </div>
-            )}
-          </Panel>
-
-          {lib.error && (
-            <Alert tone="danger" title="The test cases could not be loaded">
-              {lib.error}
-            </Alert>
+          </div>
+          {selected.size > 0 && (
+            <div className={list.bulk} role="region" aria-label="Selected test cases">
+              <strong>{selected.size} selected</strong>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="play"
+                onClick={() => setRunning({ ids, concurrent: false })}
+              >
+                Run {selected.size}
+              </Button>
+              <Button size="sm" icon="users" onClick={() => setRunning({ ids, concurrent: true })}>
+                Concurrent run
+              </Button>
+              <Button size="sm" icon="sliders" loading={busy} onClick={() => void fill(ids)}>
+                Auto-fill parameters
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                Clear selection
+              </Button>
+            </div>
           )}
+        </div>
 
+        {lib.error && (
+          <Alert tone="danger" title="The test cases could not be loaded">
+            {lib.error}
+          </Alert>
+        )}
+
+        <div className={list.dense}>
           <DataTable
             caption="Test cases ready to run"
             columns={columns}
@@ -354,36 +349,6 @@ export function TestExecutionPage() {
             }
           />
         </div>
-
-        <Panel
-          title="Recent runs"
-          actions={
-            <a className="button-link" href={href('runs')}>
-              All runs
-            </a>
-          }
-        >
-          {recent.length === 0 ? (
-            <EmptyState icon="runs" title="No runs yet">
-              Start one from the list.
-            </EmptyState>
-          ) : (
-            <ul className={styles.recent}>
-              {recent.map((r) => (
-                <li key={r.id}>
-                  <a href={href('runs', r.id)} className={styles.recentRow}>
-                    <StatusBadge status={r.status} />
-                    <span className={styles.recentMeta}>
-                      <span>{plural(r.summary.total, 'case')}</span>
-                      <span className={list.sub}>{formatDate(r.startedAt ?? r.createdAt)}</span>
-                    </span>
-                    <strong className={styles.rate}>{pct(r.summary.passRate)}</strong>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
       </div>
 
       {running && (

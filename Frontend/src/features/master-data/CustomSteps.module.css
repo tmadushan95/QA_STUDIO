@@ -58,16 +58,73 @@
   font-size: var(--text-xs);
 }
 
-/* The dialog */
+/* The dialog: the form on the left, the preview and a "ready to save?" list beside it on wide screens (under it on
+   narrow ones). Each numbered section is a panel, so the order reads 1 → 2 → 3. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--space-5);
+  align-items: start;
+}
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
+  min-width: 0;
 }
 .section {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.side {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.checklist {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-subtle);
+}
+.checklist ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.checklist li {
+  color: var(--color-text-secondary);
+}
+.checklist li[data-done='true'] {
+  color: var(--color-success);
+}
+.footerNote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-right: auto;
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-medium);
+}
+.footerNote[data-tone='ok'] {
+  color: var(--color-success);
+}
+.footerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 .sectionTitle {
   display: flex;
@@ -99,15 +156,40 @@
   padding: 0;
   list-style: none;
 }
+/* One input: a small card with its number, Required and Remove on top, then labelled boxes. */
 .inputRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr) auto auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  align-items: center;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-subtle);
+}
+.inputHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+.inputHead > :first-child {
+  margin-right: auto;
+}
+.inputFields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+}
+.inputField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.inputLabel {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
 }
 .wideCell {
   grid-column: 1 / -1;
@@ -157,12 +239,33 @@
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
-@media (max-width: 47.5rem) {
-  .inputRow {
-    grid-template-columns: minmax(0, 1fr) auto;
+@media (max-width: 64rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .inputRow > :nth-child(2),
-  .inputRow > :nth-child(3) {
-    grid-column: 1 / -1;
+  .side {
+    position: static;
+  }
+}
+@media (max-width: 47.5rem) {
+  .section {
+    padding: var(--space-3);
+  }
+  .inputFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .footerNote {
+    flex-basis: 100%;
+    font-size: var(--text-sm);
+  }
+  .footerActions {
+    flex: 1;
+  }
+  .footerActions > * {
+    flex: 1;
+  }
+  /* The header's ✕ closes the sheet; the footer keeps the button that does something. */
+  .cancel {
+    display: none;
   }
 }

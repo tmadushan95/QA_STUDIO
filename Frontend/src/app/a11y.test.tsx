@@ -103,7 +103,8 @@ describe('accessibility (axe-core, no violations)', () => {
     visit('/project/GENERAL/test-execution');
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'TC_1' }));
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View steps' }));
     await screen.findByDisplayValue('Delete');
     expect(await violations(document.body)).toEqual([]);
     await user.click(screen.getByRole('tab', { name: /Parameters/ }));

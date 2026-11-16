@@ -1,7 +1,16 @@
-/* GenerateCasesPanel. */
-.panel {
+/*
+ * GenerateCasesPanel: the prompt on top, the proposals under it.
+ */
+.panel,
+.workspace {
   display: grid;
   gap: var(--space-5);
+}
+.output {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  align-content: start;
 }
 .sub {
   margin: 0;
@@ -14,7 +23,7 @@
   font-size: var(--text-xs);
 }
 
-/* The prompt composer: the first thing on the page. */
+/* The composer: a soft card holding one prompt box and a row of settings for the request. */
 .composer {
   display: grid;
   gap: var(--space-3);
@@ -23,15 +32,59 @@
   border-radius: var(--radius-xl);
   background: var(--gradient-hero);
 }
-.composer textarea {
-  min-height: 6.5rem;
-  font-size: var(--text-md);
+.composer[data-compact] {
+  padding: var(--space-4);
+}
+/* The prompt box: the text area and its bottom edge (examples, Generate) read as one input, ringed when focused. */
+.promptBox {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+.promptBox:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+.promptInput {
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: var(--text-md);
+  line-height: 1.55;
+  resize: vertical;
+}
+/* The box itself shows focus, so the text area inside does not draw a second ring. */
+.promptInput:focus-visible {
+  box-shadow: none;
+}
+.promptBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-subtle);
+}
+.generate {
+  margin-left: auto;
 }
 .examples {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 .chip {
   display: inline-flex;
@@ -49,6 +102,13 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
+/* The request's settings: skills, where to save, write steps, side by side and wrapping as room runs out. */
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+}
 /* Saved skills: a chip puts /name into the prompt. */
 .skills {
   display: flex;
@@ -56,25 +116,28 @@
   align-items: center;
   gap: var(--space-2);
 }
-.composerFoot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
 
 /* Results. */
 .results {
   display: grid;
   gap: var(--space-3);
 }
+/* The bar above the cards: count, where they go, and "Save selected", kept in reach while the cards scroll. */
 .resultsHead {
+  position: sticky;
+  /* Below whatever sticks above the panel; the page that hosts it says how tall that is. */
+  top: var(--generate-sticky-top, 0px);
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 .resultsTitle {
   font-size: var(--text-md);
@@ -145,8 +208,14 @@
   .composer {
     padding: var(--space-4);
   }
-  .composerFoot > button,
+  .generate,
   .actions > button:last-child {
     width: 100%;
   }
+}
+/* A proposal's title: wraps over two lines instead of being cut off. */
+.titleBox {
+  min-height: 0;
+  resize: vertical;
+  font-weight: var(--weight-semibold);
 }

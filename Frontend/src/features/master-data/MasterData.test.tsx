@@ -274,8 +274,8 @@ describe('filing test cases', () => {
     fakeServer(routes);
     go('/project/GENERAL/test-cases');
     render(<App />);
-    expect(await screen.findByRole('button', { name: 'TC_1' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'TC_2' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('rowheader', { name: 'TC_1' })).toBeInTheDocument();
+    expect(screen.queryByRole('rowheader', { name: 'TC_2' })).not.toBeInTheDocument();
     const suites = within(screen.getByLabelText('Test suite')).getAllByRole('option');
     expect(suites.map((o) => o.textContent)).toEqual(['All suites', 'Projects']);
   });
@@ -285,12 +285,12 @@ describe('filing test cases', () => {
     go('/project/GENERAL/test-cases');
     const user = userEvent.setup();
     render(<App />);
-    expect(await screen.findByRole('button', { name: 'TC_1' })).toBeInTheDocument();
+    expect(await screen.findByRole('rowheader', { name: 'TC_1' })).toBeInTheDocument();
     const scope = screen.getByRole('navigation', { name: 'Project and version' });
     await user.click(within(scope).getByRole('button', { name: /Switch project/ }));
     await user.click(await screen.findByRole('menuitem', { name: 'Capex' }));
-    expect(await screen.findByRole('button', { name: 'TC_2' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'TC_1' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('rowheader', { name: 'TC_2' })).toBeInTheDocument();
+    expect(screen.queryByRole('rowheader', { name: 'TC_1' })).not.toBeInTheDocument();
     expect(window.location.pathname).toBe('/project/CAPEX/test-cases');
   });
 

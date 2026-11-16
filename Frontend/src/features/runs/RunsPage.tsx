@@ -1,18 +1,17 @@
 /**
  * Runs page: every run with its pass rate, and the detail of one run (`/run-history/<id>`): each case's result, its
  * steps with timings, the failure with expected/actual, screenshots and traces, reports, and "Explain with AI" for
- * a failed case. Updates live while a run is in progress.
+ * a failed case. While a run is in progress the detail is a live view: progress ring, ticking clocks and a bar split
+ * by result, updated as results arrive.
  */
 import { useProjectScope } from '../master-data/index.js';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Button,
   DataTable,
   EmptyState,
   PageHeader,
-  Panel,
-  ProgressBar,
   StatusBadge,
   useToast,
   type Column,
@@ -23,6 +22,7 @@ import { useResource } from '../../shared/hooks/useAsync.js';
 import { href } from '../../shared/hooks/useRoute.js';
 import { formatDate, formatDuration, plural } from '../../shared/lib/format.js';
 import { explainFailure, type Diagnosis } from '../ai-assistant/api.js';
+import { StatusFilter } from '../test-cases/components/StatusFilter.js';
 import {
   ACTIVE,
   artifactUrl,
@@ -107,12 +107,62 @@ function RunList() {
   );
 }
 
+/** The current time, ticking every second while `live` (so elapsed clocks move); frozen otherwise. */
+function useNow(live: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!live) return;
+    setNow(Date.now());
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [live]);
+  return now;
+}
+
+/** "1:05" or "1:02:05": an elapsed time as a clock. */
+function clock(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const two = (n: number) => String(n).padStart(2, '0');
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
+}
+
+/** How long something took, or has been going on so far while it runs. */
+function elapsed(
+  start: string | undefined,
+  end: string | undefined,
+  now: number,
+): number | undefined {
+  if (!start) return undefined;
+  return (end ? Date.parse(end) : now) - Date.parse(start);
+}
+
+type CaseFilter = 'all' | 'running' | 'failed' | 'blocked' | 'passed' | 'queued';
+
+/** The parts of the run's progress bar and tiles, in the order they fill. */
+const SEGMENTS = [
+  { key: 'passed', label: 'Passed', glyph: '✓' },
+  { key: 'failed', label: 'Failed', glyph: '✕' },
+  { key: 'blocked', label: 'Blocked', glyph: '!' },
+  { key: 'running', label: 'Running', glyph: '▶' },
+  { key: 'queued', label: 'Queued', glyph: '…' },
+] as const;
+
+/**
+ * One run, shown live: a progress ring with the share finished, a ticking clock, a tile per result and one bar split
+ * by result, then the cases (filterable). A running case shows its own clock and a moving accent. Every status is
+ * said in words as well as colour.
+ */
 function RunDetail({ id }: { id: string }) {
   const toast = useToast();
   const run = useResource(() => fetchRun(id), [id]);
   const [open, setOpen] = useState<string>();
+  const [filter, setFilter] = useState<CaseFilter>('all');
   useLive((e) => e.type === 'run' && e.id === id && run.reload());
   const r = run.data;
+  const active = r ? ACTIVE.includes(r.status) : false;
+  const now = useNow(active);
   if (run.error)
     return (
       <Alert tone="danger" title="This run could not be loaded">
@@ -120,8 +170,29 @@ function RunDetail({ id }: { id: string }) {
       </Alert>
     );
   if (!r) return <EmptyState icon="refresh" title="Loading the run…" />;
-  const active = ACTIVE.includes(r.status);
+  const counts = r.summary.counts;
+  const total = r.summary.total;
   const done = r.cases.filter((c) => !ACTIVE.includes(c.status)).length;
+  const share = total === 0 ? 0 : Math.round((done / total) * 100);
+  const runTime = elapsed(r.startedAt, active ? undefined : r.endedAt, now);
+  const pctOf = (n: number) => (total === 0 ? 0 : (n / total) * 100);
+  // The ring fills by result, so its colours match the bar and the tiles.
+  let at = 0;
+  const ring = SEGMENTS.filter((s) => s.key !== 'queued')
+    .map((s) => {
+      const from = at;
+      at += pctOf(counts[s.key]);
+      return `var(--run-${s.key}) ${from}% ${at}%`;
+    })
+    .concat(`var(--color-border) ${at}% 100%`)
+    .join(', ');
+  const matchesFilter = (status: string) =>
+    filter === 'all' ||
+    status === filter ||
+    (filter === 'blocked' && (status === 'skipped' || status === 'cancelled'));
+  const shown = r.cases
+    .map((c, i) => ({ c, key: `${c.caseId}-${c.account ?? ''}-${i}` }))
+    .filter(({ c }) => matchesFilter(c.status));
 
   return (
     <>
@@ -163,23 +234,101 @@ function RunDetail({ id }: { id: string }) {
           </>
         }
       />
-      <div className={styles.summary}>
-        <StatusBadge status={r.status} />
-        <span>
-          {done} / {r.summary.total} finished
-        </span>
-        <span className={styles.pass}>✓ {r.summary.counts.passed} passed</span>
-        <span className={styles.fail}>✕ {r.summary.counts.failed} failed</span>
-        <span className={styles.block}>! {r.summary.counts.blocked} blocked</span>
-        <span>Pass rate {pct(r.summary.passRate)}</span>
+
+      <section className={styles.hero} data-active={active} aria-label="Run progress">
+        <div
+          className={styles.ring}
+          style={{ background: `conic-gradient(${ring})` }}
+          aria-hidden="true"
+        >
+          <span className={styles.ringInner}>
+            <strong>{share}%</strong>
+            <span>done</span>
+          </span>
+        </div>
+        <div className={styles.heroMain}>
+          <div className={styles.heroHead}>
+            {active ? (
+              <span className={styles.live}>
+                <span className={styles.liveDot} aria-hidden="true" /> Live ·{' '}
+                {r.status === 'queued' ? 'waiting to start' : 'running'}
+              </span>
+            ) : (
+              <StatusBadge status={r.status} />
+            )}
+            {/* Said once per change, not every second: the clock itself is not announced. */}
+            <strong aria-live="polite">
+              {done} of {total} finished
+            </strong>
+            {runTime !== undefined && (
+              <span className={styles.muted}>
+                {active ? 'Elapsed' : 'Took'} <span className={styles.clock}>{clock(runTime)}</span>
+              </span>
+            )}
+            <span className={styles.muted}>Pass rate {pct(r.summary.passRate)}</span>
+          </div>
+          <div
+            className={styles.bar}
+            role="progressbar"
+            aria-label="Cases finished"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(total, 1)}
+            aria-valuenow={done}
+          >
+            {SEGMENTS.map((s) =>
+              counts[s.key] > 0 ? (
+                <span
+                  key={s.key}
+                  className={styles.segment}
+                  data-status={s.key}
+                  style={{ width: `${pctOf(counts[s.key])}%` }}
+                />
+              ) : null,
+            )}
+          </div>
+          <ul className={styles.tiles} aria-label="Results so far">
+            {SEGMENTS.map((s) => (
+              <li key={s.key} className={styles.tile} data-status={s.key}>
+                <span className={styles.tileGlyph} aria-hidden="true">
+                  {s.glyph}
+                </span>
+                <strong>{counts[s.key]}</strong>
+                <span>{s.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <div className={styles.casesHead}>
+        <StatusFilter
+          label="Show cases"
+          active={filter}
+          onChange={(f) => setFilter(f as CaseFilter)}
+          chips={[
+            { id: 'all', label: 'All cases', count: total },
+            ...SEGMENTS.filter((s) => counts[s.key] > 0).map((s) => ({
+              id: s.key,
+              label: s.label,
+              count: counts[s.key],
+              color: `var(--run-${s.key})`,
+            })),
+          ]}
+        />
       </div>
-      {active && <ProgressBar value={done} max={r.summary.total} label="Run progress" />}
-      <div className={styles.cases}>
-        {r.cases.map((c, i) => {
-          const key = `${c.caseId}-${c.account ?? ''}-${i}`;
+
+      <ul className={styles.cases} aria-label="Cases in this run">
+        {shown.length === 0 && (
+          <li>
+            <EmptyState icon="search" title="No case has this result" />
+          </li>
+        )}
+        {shown.map(({ c, key }) => {
           const isOpen = open === key;
+          const caseTime = elapsed(c.startedAt, c.endedAt, now);
+          const running = c.status === 'running';
           return (
-            <Panel key={key} flush>
+            <li key={key} className={styles.case} data-status={c.status}>
               <button
                 type="button"
                 className={styles.caseHead}
@@ -190,7 +339,23 @@ function RunDetail({ id }: { id: string }) {
                 <span className={styles.caseId}>{c.caseId}</span>
                 <span className={styles.caseTitle}>{c.title}</span>
                 {c.account && <span className={styles.muted}>as {c.account}</span>}
-                <span className={styles.muted}>{formatDuration(c.durationMs)}</span>
+                {running ? (
+                  <span className={styles.muted}>
+                    {plural(c.steps.length, 'step')} done ·{' '}
+                    <span className={styles.clock}>{clock(caseTime ?? 0)}</span>
+                  </span>
+                ) : (
+                  <span className={styles.muted}>
+                    {c.durationMs !== undefined
+                      ? formatDuration(c.durationMs)
+                      : caseTime !== undefined
+                        ? clock(caseTime)
+                        : '—'}
+                  </span>
+                )}
+                <span className={styles.chevron} aria-hidden="true">
+                  ›
+                </span>
               </button>
               {c.failure && <p className={styles.failure}>{c.failure.message}</p>}
               {isOpen && (
@@ -207,16 +372,27 @@ function RunDetail({ id }: { id: string }) {
                       </div>
                     </dl>
                   )}
-                  <ol className={styles.steps}>
-                    {c.steps.map((s) => (
-                      <li key={s.index}>
-                        <StatusBadge status={s.status} />
-                        <code>{s.action}</code>
-                        <span className={styles.muted}>{formatDuration(s.durationMs)}</span>
-                        {s.failure && <span className={styles.stepFail}>{s.failure.message}</span>}
-                      </li>
-                    ))}
-                  </ol>
+                  {c.steps.length === 0 ? (
+                    <p className={styles.muted}>
+                      {c.status === 'queued' ? 'Waiting for a browser.' : 'No steps recorded.'}
+                    </p>
+                  ) : (
+                    <ol className={styles.steps}>
+                      {c.steps.map((s) => (
+                        <li key={s.index} data-status={s.status}>
+                          <span className={styles.stepNo} aria-hidden="true">
+                            {s.index + 1}
+                          </span>
+                          <StatusBadge status={s.status} />
+                          <code>{s.action}</code>
+                          <span className={styles.muted}>{formatDuration(s.durationMs)}</span>
+                          {s.failure && (
+                            <span className={styles.stepFail}>{s.failure.message}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                   {c.artifacts.length > 0 && (
                     <div className={styles.artifacts}>
                       {c.artifacts.map((a) =>
@@ -237,10 +413,10 @@ function RunDetail({ id }: { id: string }) {
                   )}
                 </div>
               )}
-            </Panel>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </>
   );
 }

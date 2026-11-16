@@ -2,7 +2,7 @@
  * Requests of the Runs feature: start a run (cases × accounts), follow it, cancel it, and read its evidence and
  * reports. Sign-in is done by the run from each project's setup, never by a step.
  */
-import type { Run, RunSummary } from '@qa-studio/shared';
+import type { Run, RunMode, RunSummary } from '@qa-studio/shared';
 import { get, send, seg } from '../../shared/api/http.js';
 import type { Account } from '../master-data/api.js';
 
@@ -61,8 +61,20 @@ export async function fetchRuns(scope?: ScopeQuery): Promise<RunView[]> {
 export const fetchRun = (id: string) => get<RunView>(`/api/runs/${seg(id)}`);
 
 /** Start a run. */
-export const startRun = (caseIds: string[], accountIds: string[], workers?: number) =>
-  send<RunView>('/api/runs', { caseIds, accountIds, ...(workers !== undefined && { workers }) });
+export const startRun = (
+  caseIds: string[],
+  accountIds: string[],
+  workers?: number,
+  mode?: RunMode,
+  browsersPerUser?: number,
+) =>
+  send<RunView>('/api/runs', {
+    caseIds,
+    accountIds,
+    ...(workers !== undefined && { workers }),
+    ...(mode !== undefined && { mode }),
+    ...(browsersPerUser !== undefined && { browsersPerUser }),
+  });
 
 /** Stop a run. */
 export const cancelRun = (id: string) =>

@@ -1,18 +1,27 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { chromium, firefox, webkit, type Browser, type Page } from 'playwright';
+import {
+  chromium,
+  firefox,
+  webkit,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from 'playwright';
 import {
   LEGACY_PAGES,
   runScenario,
   signIn,
   SignInError,
   waitForManualSignIn,
+  waitSignedIn,
   type ActionEnv,
   type ActionRegistry,
   type Credentials,
   type PageSpec,
+  type SignInConfig,
 } from '@qa-studio/automation-core';
-import type { AppSettings, Logger, StepResult } from '@qa-studio/shared';
+import type { AppSettings, Logger, RunMode, StepResult } from '@qa-studio/shared';
 import type { CaseExecutor, CaseJob, CaseOutcome } from './run-manager.js';
 
 /** A directory-safe name derived from a test case ID. Prevents path traversal via crafted IDs. */
@@ -57,10 +66,54 @@ function storageState(session: string | undefined): StorageState | undefined {
   }
 }
 
+/**
+ * The longest a case waits to see that a reused sign-in still works before signing in again. Short, because when the
+ * sign-in has expired the full sign-in follows anyway.
+ */
+const RESUME_CHECK_MS = 15_000;
+
+/** What a run keeps open between its cases in `clean` and `shared` mode. Released by `endRun`. */
+interface RunPool {
+  /** One browser per browser kind and launch options, shared by the run's cases. */
+  browsers: Map<string, Promise<Browser>>;
+  /** `clean`: each account's browser state, taken right after its first sign-in, so later cases start signed in. */
+  states: Map<string, StorageState>;
+  /** `shared`: each account's window, used by its cases one after another. */
+  windows: Map<string, { context: BrowserContext; page: Page }>;
+}
+
+/** The window one case runs in, however the run's mode provides it. */
+interface CaseWindow {
+  context: BrowserContext;
+  page: Page;
+  /** True when the window may already be signed in as the account: a saved sign-in, or the shared window. */
+  signedInBefore: boolean;
+  /** Close what only this case needed. With `discard`, also drop what was kept for the account's later cases. */
+  release(discard: boolean): Promise<void>;
+  /** Stop the case at once (on cancel) by closing its window. */
+  abort(): void;
+}
+
+/**
+ * Which kept sign-in or window a job may reuse. Settings are read per case, so the key includes what decides whether a
+ * sign-in still applies: the project, the account, the app's address and the sign-in method.
+ */
+const reuseKey = (job: CaseJob, s: AppSettings): string =>
+  `${job.projectId ?? ''}|${job.account?.id ?? ''}|${s.appUrl}|${s.login.strategy}`;
+
 /** How long a person has to finish signing in by hand (including any second factor). */
 export const MANUAL_SIGN_IN_MS = 5 * 60_000;
 
 const launchers = { chromium, firefox, webkit };
+
+/**
+ * A visible browser opens as a full (maximized) window and its pages use the window's real size, so a person watching
+ * sees the application as they would use it. Headless runs keep Playwright's fixed viewport, so their screenshots do not
+ * change. Only Chromium has a maximize switch; Firefox and WebKit open at their default window size.
+ */
+const fullWindow = (s: Pick<AppSettings, 'browser' | 'headless'>) =>
+  s.headless ? {} : { ...(s.browser === 'chromium' && { args: ['--start-maximized'] }) };
+const windowViewport = (s: Pick<AppSettings, 'headless'>) => (s.headless ? {} : { viewport: null });
 
 const SNAPSHOT_LIMIT = 20_000;
 
@@ -114,24 +167,152 @@ const blocked = (
 });
 
 /**
- * Runs each case in its own browser: open a fresh browser window, load the app, sign in as the job's account,
- * then run the scenario. Nothing is shared between cases or accounts.
+ * Runs cases in a browser, signed in as the job's account, according to the run's mode:
+ * - `concurrent` (or no mode): a fresh browser per case that signs in itself. Nothing is shared between cases.
+ * - `clean`: one browser for the run; each account signs in once, and every case gets a new window (browser context)
+ *   that starts from that signed-in state. Nothing else carries over between cases.
+ * - `shared`: one browser for the run; each account signs in once and its cases run in the same window in turn.
+ * The run manager never runs one account in two places at once, so a kept window is only ever used by one case.
  */
 export class PlaywrightExecutor implements CaseExecutor {
   private readonly open = new Set<Browser>();
   /** `${runId}:${accountId}` -> why sign-in failed. Stops us hammering an account that may lock out. */
   private readonly signInFailures = new Map<string, string>();
+  /** runId -> what the run keeps open between cases (`clean` and `shared` mode only). */
+  private readonly pools = new Map<string, RunPool>();
 
   constructor(private readonly o: PlaywrightExecutorOptions) {}
 
   /** Close any browser still open (for shutdown). */
   async close(): Promise<void> {
+    this.pools.clear();
     await Promise.all([...this.open].map((b) => b.close().catch(() => undefined)));
     this.open.clear();
   }
 
+  /** Close everything the run kept open between its cases. */
+  async endRun(runId: string): Promise<void> {
+    const pool = this.pools.get(runId);
+    if (!pool) return;
+    this.pools.delete(runId);
+    const browsers = await Promise.all(
+      [...pool.browsers.values()].map((p) => p.catch(() => undefined)),
+    );
+    await Promise.all(browsers.map((b) => b?.close().catch(() => undefined)));
+  }
+
+  private pool(runId: string): RunPool {
+    let pool = this.pools.get(runId);
+    if (!pool) {
+      pool = { browsers: new Map(), states: new Map(), windows: new Map() };
+      this.pools.set(runId, pool);
+    }
+    return pool;
+  }
+
+  /** The run's browser for these settings, launched on first use and again if it was closed or crashed. */
+  private async pooledBrowser(pool: RunPool, s: AppSettings): Promise<Browser> {
+    const key = `${s.browser}|${s.headless}|${s.slowMoMs}`;
+    const existing = pool.browsers.get(key);
+    if (existing) {
+      const browser = await existing.catch(() => undefined);
+      if (browser?.isConnected()) return browser;
+    }
+    // The promise is stored before it settles, so two cases starting together share one launch.
+    const launching = this.launch(s);
+    pool.browsers.set(key, launching);
+    launching.catch(() => pool.browsers.delete(key));
+    return launching;
+  }
+
+  /** The window a case runs in, as the run's mode provides it. */
+  private async openWindow(
+    job: CaseJob,
+    settings: AppSettings,
+    runId: string,
+    mode: RunMode | undefined,
+    state: StorageState | undefined,
+  ): Promise<CaseWindow> {
+    const options = (saved: StorageState | undefined) => ({
+      baseURL: settings.appUrl,
+      ...windowViewport(settings),
+      ...(saved && { storageState: saved }),
+    });
+
+    if (mode !== 'clean' && mode !== 'shared') {
+      // A fresh browser and context per case: no cookies, storage or pages shared with any other case.
+      const browser = await this.launch(settings);
+      try {
+        const context = await browser.newContext(options(state));
+        const page = await context.newPage();
+        const close = () => browser.close().catch(() => undefined);
+        return { context, page, signedInBefore: false, release: close, abort: () => void close() };
+      } catch (e) {
+        await browser.close().catch(() => undefined);
+        throw e;
+      }
+    }
+
+    const pool = this.pool(runId);
+    const key = reuseKey(job, settings);
+    const browser = await this.pooledBrowser(pool, settings);
+
+    if (mode === 'clean') {
+      const saved = pool.states.get(key);
+      const context = await browser.newContext(options(saved ?? state));
+      const page = await context.newPage();
+      const close = () => context.close().catch(() => undefined);
+      return {
+        context,
+        page,
+        signedInBefore: saved !== undefined,
+        release: async (discard) => {
+          if (discard) pool.states.delete(key);
+          await close();
+        },
+        abort: () => void close(),
+      };
+    }
+
+    const kept = pool.windows.get(key);
+    const reusable =
+      kept !== undefined && !kept.page.isClosed() && browser.contexts().includes(kept.context);
+    const win = reusable ? kept : await newWindow(browser, options(state));
+    pool.windows.set(key, win);
+    const close = () => win.context.close().catch(() => undefined);
+    return {
+      ...win,
+      signedInBefore: reusable,
+      release: async (discard) => {
+        // The window stays open for the account's next case unless it broke or must not be reused.
+        if (!discard && !win.page.isClosed()) return;
+        if (pool.windows.get(key) === win) pool.windows.delete(key);
+        await close();
+      },
+      abort: () => void close(),
+    };
+  }
+
+  /**
+   * See whether a window that signed in before is still signed in: open the app and wait for the signed-in sign.
+   * False when it is not (expired, signed out by a case, terms to accept); the caller then signs in in full.
+   */
+  private async stillSignedIn(page: Page, cfg: SignInConfig): Promise<boolean> {
+    try {
+      await page.goto(cfg.baseUrl, { timeout: cfg.timeoutMs });
+      await waitSignedIn(page, cfg, Math.min(cfg.timeoutMs, RESUME_CHECK_MS));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private async launch(s: AppSettings): Promise<Browser> {
-    const browser = await launchers[s.browser].launch({ headless: s.headless, slowMo: s.slowMoMs });
+    const browser = await launchers[s.browser].launch({
+      headless: s.headless,
+      slowMo: s.slowMoMs,
+      ...fullWindow(s),
+    });
     this.open.add(browser);
     browser.on('disconnected', () => this.open.delete(browser));
     return browser;
@@ -142,10 +323,13 @@ export class PlaywrightExecutor implements CaseExecutor {
    * factor). Returns the browser session to save. The platform types nothing.
    */
   async captureSession(s: AppSettings, timeoutMs = MANUAL_SIGN_IN_MS): Promise<string> {
-    const browser = await launchers[s.browser].launch({ headless: false });
+    const browser = await launchers[s.browser].launch({
+      headless: false,
+      ...fullWindow({ browser: s.browser, headless: false }),
+    });
     this.open.add(browser);
     try {
-      const context = await browser.newContext({ baseURL: s.appUrl });
+      const context = await browser.newContext({ baseURL: s.appUrl, viewport: null });
       const page = await context.newPage();
       await waitForManualSignIn(
         page,
@@ -258,7 +442,10 @@ export class PlaywrightExecutor implements CaseExecutor {
     }
   }
 
-  async execute(job: CaseJob, ctx: { runId: string; signal: AbortSignal }): Promise<CaseOutcome> {
+  async execute(
+    job: CaseJob,
+    ctx: { runId: string; signal: AbortSignal; mode?: RunMode },
+  ): Promise<CaseOutcome> {
     const { o } = this;
     const log = o.log.child({ runId: ctx.runId, caseId: job.caseId, account: job.account?.label });
 
@@ -307,27 +494,33 @@ export class PlaywrightExecutor implements CaseExecutor {
     const caseDir = path.join(path.resolve(o.artifactsDir, safeName(ctx.runId)), rel);
     fs.mkdirSync(caseDir, { recursive: true });
 
-    const browser = await this.launch(settings);
-    const onAbort = () => void browser.close().catch(() => undefined);
+    const win = await this.openWindow(job, settings, ctx.runId, ctx.mode, state);
+    const { context, page } = win;
+    const onAbort = () => win.abort();
     ctx.signal.addEventListener('abort', onAbort, { once: true });
     const artifacts: string[] = [];
+    let discard = true; // what was kept for the account's later cases is dropped unless this case gets past sign-in
     try {
-      // A fresh browser and context per case: no cookies, storage or pages shared with any other case.
-      const context = await browser.newContext({
-        baseURL: settings.appUrl,
-        ...(state && { storageState: state }),
-      });
-      const page = await context.newPage();
-
       // Sign in BEFORE tracing starts: a trace records typed values, which would include the password.
       const steps: StepResult[] = [];
       const started = Date.now();
+      const signInCfg = {
+        ...settings.login,
+        baseUrl: settings.appUrl,
+        timeoutMs: settings.timeoutMs,
+      };
       try {
-        await signIn(
-          page,
-          { ...settings.login, baseUrl: settings.appUrl, timeoutMs: settings.timeoutMs },
-          creds,
-        );
+        // A window that signed in before (`clean` or `shared` mode) only checks it still is; otherwise sign in in full.
+        const reused =
+          needsSignIn && win.signedInBefore && (await this.stillSignedIn(page, signInCfg));
+        if (!reused) {
+          await signIn(page, signInCfg, creds);
+          // `clean`: keep the signed-in state so the account's next cases start from it instead of signing in again.
+          if (needsSignIn && ctx.mode === 'clean') {
+            const signedIn = await context.storageState().catch(() => undefined);
+            if (signedIn) this.pool(ctx.runId).states.set(reuseKey(job, settings), signedIn);
+          }
+        }
       } catch (e) {
         if (ctx.signal.aborted) {
           return {
@@ -365,6 +558,7 @@ export class PlaywrightExecutor implements CaseExecutor {
           status: 'passed',
           durationMs: Date.now() - started,
         });
+      discard = false;
 
       await context.tracing.start({ screenshots: true, snapshots: true }).catch(() => undefined);
       log.info('case started');
@@ -408,7 +602,16 @@ export class PlaywrightExecutor implements CaseExecutor {
       return { status: out.status, steps, artifacts, ...(out.failure && { failure: out.failure }) };
     } finally {
       ctx.signal.removeEventListener('abort', onAbort);
-      await browser.close().catch(() => undefined);
+      await win.release(discard || ctx.signal.aborted);
     }
   }
+}
+
+/** A new window (browser context) with one page. */
+async function newWindow(
+  browser: Browser,
+  options: Parameters<Browser['newContext']>[0],
+): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext(options);
+  return { context, page: await context.newPage() };
 }

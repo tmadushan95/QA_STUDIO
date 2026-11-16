@@ -65,6 +65,16 @@ export type CaseResult = z.infer<typeof CaseResult>;
 export const RunStatus = z.enum(['queued', 'running', 'passed', 'failed', 'cancelled']);
 export type RunStatus = z.infer<typeof RunStatus>;
 
+/**
+ * How the cases of a run share browsers and sign-ins.
+ * - `clean`: sign in once per account, then every case gets a new, already signed-in browser window. Nothing else
+ *   carries over between cases. The default.
+ * - `shared`: sign in once per account and run that account's cases in the same window, one after another.
+ * - `concurrent`: every case gets its own browser and signs in itself, so cases can run side by side as different people.
+ */
+export const RunMode = z.enum(['clean', 'shared', 'concurrent']);
+export type RunMode = z.infer<typeof RunMode>;
+
 export const Run = z.object({
   id: z.string(),
   status: RunStatus,

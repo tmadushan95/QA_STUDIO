@@ -103,7 +103,8 @@ export function CaseEditorDialog({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [conflict, setConflict] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  // Opens full screen, so every step, label and box shows in full; the header button gives the smaller popup back.
+  const [expanded, setExpanded] = useState(true);
   const [running, setRunning] = useState(false);
   /** Saved parameter values of this case, so the footer and tab can say what is missing. */
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
@@ -334,7 +335,7 @@ export function CaseEditorDialog({
                   Approve draft
                 </Button>
               )}
-              <Button className={styles.closeButton} onClick={onClose}>
+              <Button className={styles.closeButton} data-dialog-close>
                 Close
               </Button>
               <Button
@@ -458,6 +459,7 @@ export function CaseEditorDialog({
                         actions={catalog.actions}
                         pages={catalog.pages}
                         dataNames={[...new Set([...Object.keys(paramValues), ...usedNames])]}
+                        values={paramState === 'ok' ? paramValues : undefined}
                         checks={checks}
                       />
                     </div>

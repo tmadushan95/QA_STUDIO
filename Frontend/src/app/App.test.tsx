@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeServer, httpError, tc as tcOf } from '../test/fake-server.js';
 import { App } from './App.js';
+import { StartRunDialog } from '../features/runs/components/StartRunDialog.js';
 
 // Pages load on first visit (code splitting); the first visit in a test run can take over a second.
 configure({ asyncUtilTimeout: 5000 });
@@ -150,14 +151,34 @@ describe('dashboard', () => {
 });
 
 describe('test execution', () => {
+  it('gives the page to the list: no side panel or run-all buttons, and search opens from a button', async () => {
+    fakeServer();
+    go('/test-execution');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('rowheader', { name: 'TC_1' });
+    expect(screen.queryByText('Recent runs')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Run all shown|Concurrent run/ })).toBeNull();
+    // Search folds into a button, opens focused, and folds away again when left empty.
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+    const box = screen.getByRole('searchbox', { name: 'Search test cases' });
+    expect(box).toHaveFocus();
+    await user.type(box, 'zzzz');
+    await waitFor(() => expect(screen.queryByRole('rowheader', { name: 'TC_1' })).toBeNull());
+    await user.clear(box);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  });
+
   it('lists only cases that are ready, with their parameters and last result', async () => {
     fakeServer();
     go('/test-execution');
     render(<App />);
-    const row = (await screen.findByRole('button', { name: 'TC_1' })).closest('tr')!;
+    const row = (await screen.findByRole('rowheader', { name: 'TC_1' })).closest('tr')!;
     expect(within(row).getByText('1 missing')).toBeInTheDocument();
     expect(within(row).getByText('Not run yet')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'TC_2' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('rowheader', { name: 'TC_2' })).not.toBeInTheDocument();
   });
 
   it('shows how often a case ran, its last result, and the issue behind an info icon', async () => {
@@ -199,7 +220,7 @@ describe('test execution', () => {
     go('/test-execution');
     const user = userEvent.setup();
     render(<App />);
-    const row = (await screen.findByRole('button', { name: 'TC_1' })).closest('tr')!;
+    const row = (await screen.findByRole('rowheader', { name: 'TC_1' })).closest('tr')!;
     expect(await within(row).findByText('Failed')).toBeInTheDocument();
     expect(within(row).getByText('2')).toBeInTheDocument();
     await user.click(within(row).getByRole('button', { name: 'Show issue for TC_1' }));
@@ -259,11 +280,18 @@ describe('starting a run', () => {
     { id: 'a1', projectId: 1, label: 'Approver', username: 'ap@x', hasPassword: true },
     { id: 'a2', projectId: 1, label: 'Viewer', username: 'vi@x', hasPassword: true },
   ];
-  const openDialog = async (button: string | RegExp = 'Run TC_1') => {
+  /** Opens "Start a run" from a row's Run button, or (`'concurrent'`) by ticking TC_1 and using the selection bar. */
+  const openDialog = async (button: 'concurrent' | string = 'Run TC_1') => {
     go('/test-execution');
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: button }));
+    if (button === 'concurrent') {
+      await user.click(await screen.findByRole('checkbox', { name: 'Select TC_1' }));
+      const bar = screen.getByRole('region', { name: 'Selected test cases' });
+      await user.click(within(bar).getByRole('button', { name: 'Concurrent run' }));
+    } else {
+      await user.click(await screen.findByRole('button', { name: button }));
+    }
     return { user, dialog: await screen.findByRole('dialog', { name: 'Start a run' }) };
   };
 
@@ -293,10 +321,112 @@ describe('starting a run', () => {
     expect(start).toBeEnabled();
     await user.click(start);
     await waitFor(() => expect(server.sent('POST', '/api/runs')).toHaveLength(1));
-    expect(server.sent('POST', '/api/runs')[0]!.body).toMatchObject({ accountIds: ['a1'] });
+    // The recommended way to run is chosen unless the person picks another.
+    expect(server.sent('POST', '/api/runs')[0]!.body).toMatchObject({
+      accountIds: ['a1'],
+      mode: 'clean',
+    });
   });
 
-  it('runs as every user at once in concurrent mode, with a browser for each', async () => {
+  it('makes a long list of users quick to choose from: search, select the ones shown, clear', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      id: `u${i + 1}`,
+      projectId: 1,
+      label: i < 3 ? `Approver ${i + 1}` : `Viewer ${i + 1}`,
+      username: `user${i + 1}@x`,
+      hasPassword: true,
+    }));
+    fakeServer({
+      'POST /api/runs/plan': () => ({
+        groups: [
+          group({
+            projectId: 1,
+            projectName: 'Capex',
+            appUrl: 'https://capex.test',
+            accounts: many,
+          }),
+        ],
+      }),
+    });
+    const { user, dialog } = await openDialog();
+    expect(await within(dialog).findByText('0 of 12 chosen')).toBeInTheDocument();
+    await user.type(
+      within(dialog).getByRole('searchbox', { name: /Search Capex users/ }),
+      'approver',
+    );
+    expect(within(dialog).getAllByRole('checkbox')).toHaveLength(3);
+    await user.click(within(dialog).getByRole('button', { name: 'Select shown' }));
+    expect(within(dialog).getByText('3 of 12 chosen')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /^Start 3 runs/ })).toBeEnabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Clear' }));
+    expect(within(dialog).getByText('0 of 12 chosen')).toBeInTheDocument();
+    await user.clear(within(dialog).getByRole('searchbox', { name: /Search Capex users/ }));
+    await user.type(
+      within(dialog).getByRole('searchbox', { name: /Search Capex users/ }),
+      'nobody',
+    );
+    expect(within(dialog).getByText(/No user matches/)).toBeInTheDocument();
+  });
+
+  it('offers one shared window only when there are two or more test cases', async () => {
+    fakeServer({
+      'POST /api/runs/plan': () => ({
+        groups: [
+          group({ projectId: 1, projectName: 'Capex', appUrl: 'https://capex.test', accounts }),
+        ],
+      }),
+    });
+    const { dialog } = await openDialog();
+    const shared = await within(dialog).findByRole('radio', { name: /Same window/ });
+    expect(shared).toBeDisabled();
+    expect(within(dialog).getByText('Needs 2+ test cases')).toBeInTheDocument();
+    expect(within(dialog).getByRole('radio', { name: /Fresh window/ })).toBeEnabled();
+    expect(within(dialog).getByRole('radio', { name: /Concurrent users/ })).toBeEnabled();
+  });
+
+  it('runs every case in one shared window, one at a time, when that is chosen', async () => {
+    const server = fakeServer({
+      'POST /api/runs/plan': () => ({
+        workers: 3,
+        groups: [
+          group({
+            projectId: 1,
+            projectName: 'Capex',
+            appUrl: 'https://capex.test',
+            caseCount: 2,
+            accounts,
+          }),
+        ],
+      }),
+      'POST /api/runs': () => ({ id: 'r1', cases: [], summary: {} }),
+    });
+    // Two test cases: sharing a window only means something when a user runs more than one.
+    const user = userEvent.setup();
+    render(
+      <StartRunDialog
+        caseIds={['TC_1', 'TC_2']}
+        onClose={() => undefined}
+        onStarted={() => undefined}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Start a run' });
+    const fresh = await within(dialog).findByRole('radio', { name: /Fresh window/ });
+    expect(fresh).toBeChecked();
+    await user.click(within(dialog).getByRole('checkbox', { name: /Approver/ }));
+    expect(within(dialog).getByRole('spinbutton', { name: /Windows at once/ })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('radio', { name: /Same window/ }));
+    // One shared window runs one case at a time, so there is no number to choose.
+    expect(within(dialog).queryByRole('spinbutton')).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /^Start/ }));
+    await waitFor(() => expect(server.sent('POST', '/api/runs')).toHaveLength(1));
+    expect(server.sent('POST', '/api/runs')[0]!.body).toMatchObject({
+      accountIds: ['a1'],
+      mode: 'shared',
+      workers: 1,
+    });
+  });
+
+  it('runs the chosen users at once in concurrent mode, with a browser for each', async () => {
     const server = fakeServer({
       'POST /api/runs/plan': () => ({
         workers: 1,
@@ -306,16 +436,49 @@ describe('starting a run', () => {
       }),
       'POST /api/runs': () => ({ id: 'r1', cases: [], summary: {} }),
     });
-    const { user, dialog } = await openDialog(/Concurrent run/);
-    const together = await within(dialog).findByRole('checkbox', { name: /Concurrent users/ });
+    const { user, dialog } = await openDialog('concurrent');
+    const together = await within(dialog).findByRole('radio', { name: /Concurrent users/ });
     expect(together).toBeChecked();
-    expect(within(dialog).getByRole('checkbox', { name: /Approver/ })).toBeChecked();
-    expect(within(dialog).getByRole('checkbox', { name: /Viewer/ })).toBeChecked();
+    expect(within(dialog).getByRole('radio', { name: /Different users/ })).toBeChecked();
+    // Nobody is ticked for the person: they choose who signs in.
+    const approver = within(dialog).getByRole('checkbox', { name: /Approver/ });
+    const viewer = within(dialog).getByRole('checkbox', { name: /Viewer/ });
+    expect(approver).not.toBeChecked();
+    expect(viewer).not.toBeChecked();
+    expect(within(dialog).getByRole('button', { name: /^Start/ })).toBeDisabled();
+    await user.click(approver);
+    expect(within(dialog).getByRole('status')).toHaveTextContent(/Only one user is ticked/);
+    await user.click(viewer);
     await user.click(within(dialog).getByRole('button', { name: 'Start 2 runs' }));
     await waitFor(() => expect(server.sent('POST', '/api/runs')).toHaveLength(1));
+    const body = server.sent('POST', '/api/runs')[0]!.body as Record<string, unknown>;
+    expect(body).toMatchObject({ accountIds: ['a1', 'a2'], workers: 2, mode: 'concurrent' });
+    expect(body).not.toHaveProperty('browsersPerUser');
+  });
+
+  it('runs one user in several browsers at once when that is chosen', async () => {
+    const server = fakeServer({
+      'POST /api/runs/plan': () => ({
+        workers: 1,
+        groups: [
+          group({ projectId: 1, projectName: 'Capex', appUrl: 'https://capex.test', accounts }),
+        ],
+      }),
+      'POST /api/runs': () => ({ id: 'r1', cases: [], summary: {} }),
+    });
+    const { user, dialog } = await openDialog('concurrent');
+    await user.click(await within(dialog).findByRole('radio', { name: /Same user in several/ }));
+    await user.click(within(dialog).getByRole('checkbox', { name: /Approver/ }));
+    const perUser = within(dialog).getByRole('spinbutton', { name: /Browsers per user/ });
+    await user.clear(perUser);
+    await user.type(perUser, '3');
+    await user.click(within(dialog).getByRole('button', { name: 'Start 3 runs' }));
+    await waitFor(() => expect(server.sent('POST', '/api/runs')).toHaveLength(1));
     expect(server.sent('POST', '/api/runs')[0]!.body).toMatchObject({
-      accountIds: ['a1', 'a2'],
-      workers: 2,
+      accountIds: ['a1'],
+      mode: 'concurrent',
+      browsersPerUser: 3,
+      workers: 3,
     });
   });
 
@@ -359,14 +522,19 @@ describe('step cards and custom steps', () => {
     go(`${HOME}/test-execution`);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'TC_1' }));
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View steps' }));
     return { user, dialog: await screen.findByRole('dialog', { name: /TC_1/ }) };
   };
+
+  // A step's sentence highlights its values in their own elements, so it is matched on its whole text.
+  const sentence = (text: string) => (_: string, el: Element | null) =>
+    el?.tagName === 'P' && el.textContent === text;
 
   it('says each step in plain words and explains how steps work to a beginner', async () => {
     fakeServer();
     const { dialog } = await open();
-    expect(await within(dialog).findByText('Click button “Delete”')).toBeInTheDocument();
+    expect(await within(dialog).findByText(sentence('Click button “Delete”'))).toBeInTheDocument();
     expect(within(dialog).getByText('How steps work')).toBeInTheDocument();
     expect(within(dialog).getByText(/Describe the element as you see it/)).toBeInTheDocument();
   });
@@ -383,7 +551,11 @@ describe('step cards and custom steps', () => {
     });
     const { user, dialog } = await open();
     expect(await within(dialog).findByDisplayValue('Project')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Step 1: Role')).toHaveValue('{{data.roleName}}');
+    // A value that is just a parameter shows as a chip, never as {{data.roleName}}.
+    expect(within(dialog).getByRole('group', { name: 'Step 1: Role' })).toHaveTextContent(
+      'roleName',
+    );
+    expect(within(dialog).queryByDisplayValue('{{data.roleName}}')).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText(/parameters \(JSON\)/)).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Extra settings')).not.toBeInTheDocument();
     // A new step cannot pick the application step: it is not used by any other step.
@@ -403,7 +575,7 @@ describe('step cards and custom steps', () => {
     await user.selectOptions(within(dialog).getByLabelText('Step 2: action'), 'Check a permission');
     await user.type(within(dialog).getByLabelText('Step 2: Role'), 'Admin');
     expect(
-      await within(dialog).findByText('Check a permission — Role: “Admin”'),
+      await within(dialog).findByText(sentence('Check a permission — Role: “Admin”')),
     ).toBeInTheDocument();
   });
 
@@ -447,6 +619,26 @@ describe('step cards and custom steps', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens a new custom step full screen and says in words what is missing before Save', async () => {
+    fakeServer();
+    go(`${HOME}/settings/custom-steps`);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: /New custom step/ }));
+    const dialog = await screen.findByRole('dialog', { name: /New custom step/ });
+    expect(within(dialog).getByRole('button', { name: 'Exit full screen' })).toBeInTheDocument();
+    expect(within(dialog).getByText('To save: give it a name.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Save custom step' })).toBeDisabled();
+    await user.type(within(dialog).getByRole('textbox', { name: /^Name/ }), 'Check a role');
+    expect(within(dialog).getByText('To save: add at least one step.')).toBeInTheDocument();
+    const checklist = within(dialog).getByRole('region', { name: 'Ready to save?' });
+    expect(within(checklist).getByText('Name given')).toBeInTheDocument();
+    // An input shows its boxes with visible labels.
+    await user.click(within(dialog).getByRole('button', { name: 'Add input' }));
+    expect(within(dialog).getByText('Label shown to testers')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Input 1: label')).toHaveFocus();
+  });
+
   it('shows the server’s reason when it refuses a custom step', async () => {
     fakeServer({
       'PUT /api/custom-steps/1': () =>
@@ -463,14 +655,85 @@ describe('step cards and custom steps', () => {
   });
 });
 
+describe('a run in progress', () => {
+  it('shows a live view: what is finished, a tile per result, and cases filtered by result', async () => {
+    const at = new Date(Date.now() - 65_000).toISOString();
+    const result = (caseId: string, status: string) => ({
+      caseId,
+      title: `Case ${caseId}`,
+      status,
+      ...(status !== 'queued' && { startedAt: at }),
+      steps: [],
+      artifacts: [],
+    });
+    fakeServer({
+      'GET /api/runs/r9': () => ({
+        id: 'r9',
+        status: 'running',
+        createdAt: at,
+        startedAt: at,
+        environment: 'qa',
+        browser: 'chromium',
+        workers: 2,
+        cases: [result('TC_1', 'passed'), result('TC_2', 'running'), result('TC_3', 'queued')],
+        summary: {
+          total: 3,
+          counts: {
+            queued: 1,
+            running: 1,
+            passed: 1,
+            failed: 0,
+            skipped: 0,
+            blocked: 0,
+            cancelled: 0,
+          },
+          passRate: 1,
+        },
+      }),
+    });
+    go(`${HOME}/run-history/r9`);
+    const user = userEvent.setup();
+    render(<App />);
+    const progress = await screen.findByRole('region', { name: 'Run progress' });
+    expect(within(progress).getByText(/Live · running/)).toBeInTheDocument();
+    expect(within(progress).getByText('1 of 3 finished')).toBeInTheDocument();
+    expect(within(progress).getByRole('progressbar', { name: 'Cases finished' })).toHaveAttribute(
+      'aria-valuenow',
+      '1',
+    );
+    expect(within(progress).getByText('Elapsed')).toBeInTheDocument();
+    const tiles = within(progress).getByRole('list', { name: 'Results so far' });
+    expect(within(tiles).getByText('Running').previousElementSibling).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument();
+
+    const cases = screen.getByRole('list', { name: 'Cases in this run' });
+    expect(within(cases).getAllByRole('listitem')).toHaveLength(3);
+    await user.click(screen.getByRole('radio', { name: /^Running/ }));
+    expect(within(cases).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(cases).getByText('TC_2')).toBeInTheDocument();
+  });
+});
+
 describe('the step editor', () => {
   const open = async () => {
     go('/test-execution');
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'TC_1' }));
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View steps' }));
     return { user, dialog: await screen.findByRole('dialog', { name: /TC_1/ }) };
   };
+
+  it('opens a case from its row menu, full screen', async () => {
+    fakeServer();
+    go('/test-execution');
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View steps' }));
+    const dialog = await screen.findByRole('dialog', { name: /TC_1/ });
+    expect(within(dialog).getByRole('button', { name: 'Exit full screen' })).toBeInTheDocument();
+  });
 
   it('says what stands between the case and a run, and opens the tab that fixes it', async () => {
     fakeServer();
@@ -540,6 +803,22 @@ describe('the step editor', () => {
     expect(screen.getByRole('dialog', { name: /TC_1/ })).toBeInTheDocument();
   });
 
+  it('asks before the footer Close drops unsaved changes, and closes at once without them', async () => {
+    fakeServer();
+    const { user, dialog } = await open();
+    const close = () => within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!;
+    await user.type(await within(dialog).findByDisplayValue('Delete'), 'X');
+    await user.click(close());
+    const ask = await screen.findByRole('dialog', { name: 'Discard changes?' });
+    await user.click(within(ask).getByRole('button', { name: 'Cancel' }));
+    expect(within(dialog).getByDisplayValue('DeleteX')).toBeInTheDocument();
+    const name = within(dialog).getByDisplayValue('DeleteX');
+    await user.clear(name);
+    await user.type(name, 'Delete');
+    await user.click(close());
+    expect(screen.queryByRole('dialog', { name: /TC_1/ })).not.toBeInTheDocument();
+  });
+
   it('keeps parameters per case: auto-fills empty ones and saves the case’s own values', async () => {
     const server = fakeServer({
       'POST /api/parameters/TC_1/suggest': () => ({
@@ -577,9 +856,9 @@ describe('test case studio', () => {
     render(<App />);
     const status = await screen.findByRole('radiogroup', { name: 'Filter by automation status' });
     await user.click(await within(status).findByRole('radio', { name: /No steps/ }));
-    const row = (await screen.findByRole('button', { name: 'TC_2' })).closest('tr')!;
+    const row = (await screen.findByRole('rowheader', { name: 'TC_2' })).closest('tr')!;
     expect(within(row).getByText('No steps')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'TC_1' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('rowheader', { name: 'TC_1' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Select TC_2' }));
     await user.click(
       within(screen.getByRole('region', { name: 'Selected test cases' })).getByRole('button', {
@@ -597,8 +876,8 @@ describe('test case studio', () => {
     render(<App />);
     const status = await screen.findByRole('radiogroup', { name: 'Filter by automation status' });
     await user.click(within(status).getByRole('radio', { name: /Ready to run/ }));
-    expect(await screen.findByRole('button', { name: 'TC_1' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'TC_2' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('rowheader', { name: 'TC_1' })).toBeInTheDocument();
+    expect(screen.queryByRole('rowheader', { name: 'TC_2' })).not.toBeInTheDocument();
   });
 
   it('only shows the cases of the project in the header', async () => {
@@ -612,7 +891,7 @@ describe('test case studio', () => {
     });
     go(`${HOME}/test-cases`);
     render(<App />);
-    expect(await screen.findByRole('button', { name: 'TC_1' })).toBeInTheDocument();
+    expect(await screen.findByRole('rowheader', { name: 'TC_1' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'TC_OTHER' })).not.toBeInTheDocument();
   });
 
@@ -668,10 +947,14 @@ describe('test case studio', () => {
     render(<App />);
     expect(await screen.findByText(/Save to General · v1\.0/)).toBeInTheDocument();
     await user.selectOptions(await screen.findByLabelText('Test suite'), 'Projects');
-    await user.type(
-      await screen.findByLabelText(/What should be tested/),
-      'Sign in with good and bad passwords',
+    // An example chip says what it is about and fills in its whole prompt.
+    const prompt = await screen.findByLabelText(/What should be tested/);
+    await user.click(screen.getByRole('button', { name: /Create, edit and delete a draft/ }));
+    expect(prompt).toHaveValue(
+      'Create, edit and delete a draft project, checking the list after each change.',
     );
+    await user.clear(prompt);
+    await user.type(prompt, 'Sign in with good and bad passwords');
     await user.click(screen.getByRole('button', { name: 'Generate test cases' }));
     expect(await screen.findByDisplayValue('Wrong password')).toBeInTheDocument();
     expect(server.sent('POST', '/api/ai/cases')).toHaveLength(0);
@@ -939,7 +1222,8 @@ describe('parameters from the project', () => {
     go('/test-execution');
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'TC_1' }));
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View steps' }));
     const dialog = await screen.findByRole('dialog', { name: /TC_1/ });
     await user.click(within(dialog).getByRole('tab', { name: /Parameters/ }));
     const projectSource = await within(dialog).findByRole('radiogroup', {
@@ -1082,7 +1366,8 @@ describe('an outdated worker', () => {
     go('/test-execution');
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole('button', { name: 'TC_1' }));
+    await user.click(await screen.findByRole('button', { name: 'Actions for TC_1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'View steps' }));
     const dialog = await screen.findByRole('dialog', { name: /TC_1/ });
     // Not reported as a missing value: the values could not be read at all.
     expect(

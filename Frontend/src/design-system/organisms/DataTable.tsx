@@ -72,6 +72,10 @@ function useFitRowsToWindow(card: RefObject<HTMLDivElement>, enabled: boolean): 
     // Content above the table can grow or shrink (filters wrap, a banner appears); follow it where supported.
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(fit);
     observer?.observe(document.body);
+    // The body keeps its height when something above the table goes away (a finished run's live strip), so watch the
+    // page's own content too.
+    const page = el.closest('main')?.firstElementChild;
+    if (page) observer?.observe(page);
     return () => {
       observer?.disconnect();
       window.removeEventListener('resize', fit);

@@ -7,7 +7,13 @@ import { z } from 'zod';
 import type { ActionRegistry } from '@qa-studio/automation-core';
 import type { CaseJob, RunManager } from '@qa-studio/execution-engine';
 import { buildReport, renderExcel, renderHtml } from '@qa-studio/reporting';
-import { SCHEMA_VERSION, summarizeRun, type Scenario, type TestCase } from '@qa-studio/shared';
+import {
+  RunMode,
+  SCHEMA_VERSION,
+  summarizeRun,
+  type Scenario,
+  type TestCase,
+} from '@qa-studio/shared';
 import {
   buildErrorWorkbook,
   buildInventoryWorkbook,
@@ -692,6 +698,13 @@ export function createApp(
     workers: z.number().int().min(1).max(16).optional(),
     /** Test accounts to sign in as. Every chosen case runs once as each account. */
     accountIds: z.array(z.string().min(1)).max(20).optional(),
+    /** How the cases share browsers and sign-ins; `clean` when left out. */
+    mode: RunMode.optional(),
+    /**
+     * Concurrent runs only: how many browsers each chosen account signs in to at the same time ("same user in several
+     * browsers"). Every case then runs that many times at once as each account. 1 (or left out) is one browser per user.
+     */
+    browsersPerUser: z.number().int().min(1).max(8).optional(),
   });
 
   // What a chosen set of cases needs before it can start, grouped by project, so the start dialog can ask for
@@ -732,6 +745,14 @@ export function createApp(
     }
     const ids = [...new Set(body.caseIds)];
     assertKnownCases(ids);
+    const copies = body.browsersPerUser ?? 1;
+    if (copies > 1 && body.mode !== 'concurrent') {
+      throw new HttpError(
+        400,
+        'browsers-per-user-needs-concurrent',
+        'Several browsers per user can only be used with "Concurrent users".',
+      );
+    }
 
     const defaults = automation.settings.runDefaults();
     const targets = new Map(ids.map((id) => [id, targetOf(store.inventory.get(id)!)]));
@@ -783,7 +804,8 @@ export function createApp(
     // cannot be had the run is refused: running with missing or old values would give a wrong result.
     const values = automation.parameters ? await automation.parameters.effective(ids) : undefined;
 
-    // One job per case per account; with no sign-in required there is one job per case.
+    // One job per case per account (times the browsers per user, in a concurrent same-user run); with no sign-in
+    // required there is one job per case, since without an account there is no "same user" to repeat.
     const jobs: CaseJob[] = ids.flatMap((id) => {
       const tc = store.inventory.get(id)!;
       const target = targets.get(id)!;
@@ -798,13 +820,23 @@ export function createApp(
         scenario: automation.scenarios?.get(id),
         ...(values && { data: values[id] ?? {} }),
       };
-      return accounts.length > 0 ? accounts.map((account) => ({ ...base, account })) : [base];
+      if (accounts.length === 0) return [base];
+      return accounts.flatMap((account) =>
+        copies === 1
+          ? [{ ...base, account }]
+          : // Each browser is labelled, so results and evidence of the copies stay apart.
+            Array.from({ length: copies }, (_, i) => ({
+              ...base,
+              account: { ...account, label: `${account.label} (browser ${i + 1})` },
+              session: i + 1,
+            })),
+      );
     });
     if (jobs.length > MAX_JOBS) {
       throw new HttpError(
         400,
         'too-many-runs',
-        `That would start ${jobs.length} test runs (${ids.length} cases x ${chosen.length} accounts). The limit is ${MAX_JOBS}. Choose fewer cases or accounts.`,
+        `That would start ${jobs.length} test runs (${ids.length} cases x ${chosen.length} accounts${copies > 1 ? ` x ${copies} browsers each` : ''}). The limit is ${MAX_JOBS}. Choose fewer cases or accounts.`,
       );
     }
     const environments = [...new Set([...targets.values()].map((t) => t.environment))];
@@ -812,6 +844,7 @@ export function createApp(
       environment: environments.filter(Boolean).join(', ') || 'unknown',
       browser: defaults.browser,
       workers: body.workers ?? defaults.workers,
+      mode: body.mode,
     });
     return reply.code(202).send({ ...run, summary: summarizeRun(run) });
   });

@@ -68,6 +68,7 @@ const job = (caseId: string, account: string | undefined, text: string): CaseJob
   scenario: scenario(caseId, text),
 });
 const opts = { environment: 'qa', browser: 'chromium', workers: 4 };
+const count = (list: string[], user: string) => list.filter((u) => u === user).length;
 
 /** Read the files out of a .zip without extra dependencies (central directory + raw deflate). */
 function zipEntries(file: string): Map<string, Buffer> {
@@ -101,7 +102,7 @@ describe('executor with accounts', () => {
         job('TC-1', 'b1', 'Signed in as bob'), // the same case, run as a second account
         job('TC-2', 'b1', 'Signed in as alice'), // fails: this browser is bob's
       ],
-      opts,
+      { ...opts, mode: 'concurrent' },
     );
     const done = await m.whenDone(run.id)!;
     const by = Object.fromEntries(done.cases.map((c) => [`${c.caseId}/${c.account}`, c]));
@@ -122,6 +123,49 @@ describe('executor with accounts', () => {
     expect(by['TC-2/Bob (requester)']!.artifacts[0]).toBe('TC-2--Bob__requester_/failure.png');
     expect(app.signIns.filter((u) => u === 'alice').length).toBeGreaterThanOrEqual(1);
     expect(app.signIns.filter((u) => u === 'bob').length).toBeGreaterThanOrEqual(2);
+  }, 90_000);
+
+  it('clean mode: signs each account in once, and every case still starts in a new signed-in window', async () => {
+    const before = { alice: count(app.signIns, 'alice'), bob: count(app.signIns, 'bob') };
+    const m = new RunManager(executor);
+    const run = m.start(
+      [
+        job('CL-1', 'a1', 'Signed in as alice'),
+        job('CL-1', 'b1', 'Signed in as bob'),
+        job('CL-2', 'a1', 'Signed in as alice'),
+        job('CL-3', 'a1', 'Signed in as bob'), // fails: the reused sign-in is alice's, never another account's
+      ],
+      { ...opts, workers: 1, mode: 'clean' },
+    );
+    const done = await m.whenDone(run.id)!;
+    expect(done.cases.map((c) => c.status)).toEqual(['passed', 'passed', 'passed', 'failed']);
+    expect(count(app.signIns, 'alice') - before.alice).toBe(1);
+    expect(count(app.signIns, 'bob') - before.bob).toBe(1);
+    // A reused sign-in is still reported as the first step, so results read the same in every mode.
+    expect(done.cases[2]!.steps.map((s) => [s.index, s.action, s.status])).toEqual([
+      [0, 'auth.sign-in', 'passed'],
+      [1, 'app.open', 'passed'],
+      [2, 'assert.text-visible', 'passed'],
+    ]);
+    // Evidence is still kept per case.
+    expect(done.cases[3]!.artifacts).toContain('CL-3--Alice__approver_/failure.png');
+  }, 90_000);
+
+  it("shared mode: signs in once and runs the account's cases in the same window", async () => {
+    const before = count(app.signIns, 'alice');
+    const m = new RunManager(executor);
+    const run = m.start(
+      [
+        job('SH-1', 'a1', 'Signed in as alice'),
+        job('SH-2', 'a1', 'No such text'), // a failing case does not stop the next one reusing the window
+        job('SH-3', 'a1', 'Signed in as alice'),
+      ],
+      { ...opts, workers: 1, mode: 'shared' },
+    );
+    const done = await m.whenDone(run.id)!;
+    expect(done.cases.map((c) => c.status)).toEqual(['passed', 'failed', 'passed']);
+    expect(count(app.signIns, 'alice') - before).toBe(1);
+    expect(done.cases[1]!.artifacts.some((a) => a.endsWith('trace.zip'))).toBe(true);
   }, 90_000);
 
   it('never puts credentials into results, logs or traces', async () => {

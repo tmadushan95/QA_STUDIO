@@ -3,7 +3,8 @@
  * PRJ-1" — and turns that into the step's `target`. No CSS selectors are ever shown or needed.
  */
 import type { ReactNode } from 'react';
-import { Select, TextInput } from '../../../design-system/index.js';
+import { Select } from '../../../design-system/index.js';
+import type { TextFieldProps } from './ParameterPicker.js';
 import styles from './StepEditor.module.css';
 
 /** The stored shape of a target (matches the server's Target schema). */
@@ -95,12 +96,12 @@ export interface TargetFieldProps {
   step: number;
   /** Field label from the action, such as "Field" or "Element". */
   label: string;
-  /** Insert-parameter helper, given by the step row. */
-  dataPicker?: (insert: (token: string) => void) => ReactNode;
+  /** Renders a text box that can hold parameters (given by the step row). */
+  textField: (props: TextFieldProps) => ReactNode;
 }
 
 /** Describes the element a step acts on, the way a person would. */
-export function TargetField({ value, onChange, step, label, dataPicker }: TargetFieldProps) {
+export function TargetField({ value, onChange, step, label, textField }: TargetFieldProps) {
   const t = value ?? {};
   const findBy = findByOf(t);
   const words = wordsOf(t);
@@ -121,17 +122,12 @@ export function TargetField({ value, onChange, step, label, dataPicker }: Target
           </option>
         ))}
       </Select>
-      <span className={styles.withData}>
-        <TextInput
-          aria-label={`Step ${step}: ${label}, name or text`}
-          placeholder={
-            findBy === 'label' ? 'Field label, e.g. Search' : 'Visible text, e.g. Delete'
-          }
-          value={words}
-          onChange={(e) => set(findBy, e.target.value)}
-        />
-        {dataPicker?.((token) => set(findBy, `${words}${token}`))}
-      </span>
+      {textField({
+        label: `Step ${step}: ${label}, name or text`,
+        placeholder: findBy === 'label' ? 'Field label, e.g. Search' : 'Visible text, e.g. Delete',
+        value: words,
+        onChange: (v) => set(findBy, v),
+      })}
       <Select
         aria-label={`Step ${step}: where`}
         value={within.kind}
@@ -144,19 +140,13 @@ export function TargetField({ value, onChange, step, label, dataPicker }: Target
           </option>
         ))}
       </Select>
-      {within.kind && (
-        <span className={styles.withData}>
-          <TextInput
-            aria-label={`Step ${step}: ${within.kind === 'row' ? 'row contains' : 'container name'}`}
-            placeholder={within.kind === 'row' ? 'e.g. {{data.project}}' : 'optional'}
-            value={within.words.trim()}
-            onChange={(e) => set(findBy, words, within.kind, e.target.value)}
-          />
-          {dataPicker?.((token) =>
-            set(findBy, words, within.kind, `${within.words.trim()}${token}`),
-          )}
-        </span>
-      )}
+      {within.kind &&
+        textField({
+          label: `Step ${step}: ${within.kind === 'row' ? 'row contains' : 'container name'}`,
+          placeholder: within.kind === 'row' ? 'e.g. PRJ-1, or a parameter' : 'optional',
+          value: within.words.trim(),
+          onChange: (v) => set(findBy, words, within.kind, v),
+        })}
     </div>
   );
 }

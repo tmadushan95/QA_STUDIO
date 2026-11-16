@@ -120,18 +120,10 @@
 }
 
 /* Table cells. */
-.idLink {
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--color-primary);
+.caseId {
   font-family: var(--font-mono);
   font-weight: var(--weight-semibold);
   white-space: nowrap;
-  cursor: pointer;
-}
-.idLink:hover {
-  text-decoration: underline;
 }
 .title {
   display: flex;
@@ -176,4 +168,34 @@
   .statValue {
     font-size: var(--text-lg);
   }
+}
+
+/*
+ * Compact rows (Test Execution): one line per case where the window allows (the title with its suite beside it, the
+ * last result with its date beside it), so about ten cases show without scrolling.
+ */
+.dense table td,
+.dense table tbody th {
+  padding-top: var(--space-1);
+  padding-bottom: var(--space-1);
+}
+/* Row buttons (Run, ⋯) at the small size, so they do not set the row height. */
+.dense .rowActions button {
+  min-height: 1.875rem;
+}
+.dense .rowActions button[aria-haspopup] {
+  width: 1.875rem;
+}
+.dense .title {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  min-width: 18rem;
+}
+.dense .last {
+  flex-direction: row;
+  align-items: center;
+  column-gap: var(--space-2);
+  white-space: nowrap;
 }

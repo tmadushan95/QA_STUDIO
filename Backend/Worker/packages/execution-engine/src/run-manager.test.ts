@@ -345,10 +345,75 @@ describe('RunManager account scheduling', () => {
     expect(done.cases.map((c) => c.status)).toEqual(['cancelled', 'cancelled', 'cancelled']);
   });
 
+  it('runs the same account in several browsers at once only when each has its own session', async () => {
+    const { executor, stats } = tracked();
+    const m = new RunManager(executor, { maxWorkers: 8 });
+    // Two browsers of account A, two cases each: the browsers run side by side, each one case at a time.
+    const jobs = ['T1', 'T2'].flatMap((t) =>
+      [1, 2].map((session) => ({ ...withAccount(`${t}.${session}`, 'A'), session })),
+    );
+    const done = await m.whenDone(m.start(jobs, { ...opts, workers: 8, mode: 'concurrent' }).id)!;
+    expect(done.status).toBe('passed');
+    expect(stats().peakPerAccount).toBe(2);
+    expect(stats().peakTotal).toBe(2);
+  });
+
   it('records the account label on each result, never the id or any credentials', async () => {
     const m = new RunManager({ execute: async () => pass });
     const done = await m.whenDone(m.start([withAccount('1', 'A')], opts).id)!;
     expect(done.cases[0]!.account).toBe('Account A');
     expect(JSON.stringify(done)).not.toMatch(/"password"|"username"/);
+  });
+});
+
+describe('RunManager run modes', () => {
+  it('passes the run mode to every case, `clean` when none is given', async () => {
+    const seen: (string | undefined)[] = [];
+    const ex: CaseExecutor = {
+      execute: async (_j, { mode }) => {
+        seen.push(mode);
+        return pass;
+      },
+    };
+    const m = new RunManager(ex);
+    await m.whenDone(m.start([job('A'), job('B')], opts).id);
+    await m.whenDone(m.start([job('C')], { ...opts, mode: 'concurrent' }).id);
+    await m.whenDone(m.start([job('D')], { ...opts, mode: 'shared' }).id);
+    expect(seen).toEqual(['clean', 'clean', 'concurrent', 'shared']);
+  });
+
+  it('tells the executor once when a run ends, after its last case, even when a case throws', async () => {
+    const events: string[] = [];
+    const ex: CaseExecutor = {
+      execute: async (j) => {
+        events.push(`case ${j.caseId}`);
+        if (j.caseId === 'X') throw new Error('browser crashed');
+        return pass;
+      },
+      endRun: async (runId) => {
+        events.push(`end ${runId}`);
+      },
+    };
+    const m = new RunManager(ex);
+    const run = m.start([job('A'), job('X')], { ...opts, workers: 1 });
+    const done = await m.whenDone(run.id)!;
+    expect(events).toEqual(['case A', 'case X', `end ${run.id}`]);
+    expect(done.cases[1]!.failure?.kind).toBe('automation-error');
+  });
+
+  it('a failure while closing the run never changes its result', async () => {
+    const errors: unknown[] = [];
+    const m = new RunManager(
+      {
+        execute: async () => pass,
+        endRun: async () => {
+          throw new Error('close failed');
+        },
+      },
+      { onError: (e) => errors.push(e) },
+    );
+    const done = await m.whenDone(m.start([job('A')], opts).id)!;
+    expect(done.status).toBe('passed');
+    expect(errors).toHaveLength(1);
   });
 });

@@ -10,6 +10,8 @@
 .tabPanel {
   padding-top: var(--space-5);
   outline: none;
+  /* The generator's sticky parts stop below the app's top bar. */
+  --generate-sticky-top: var(--topbar-height);
 }
 .stack {
   display: grid;
