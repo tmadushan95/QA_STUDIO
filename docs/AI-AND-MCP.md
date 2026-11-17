@@ -15,13 +15,13 @@ What the AI does here, what it may not do, and how to connect an AI assistant to
 
 ## Features
 
-| Where                                                      | What                                                                                     | What it changes                                                                    |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Test cases → **Generate** (row or bulk)                    | Drafts the automation for a case                                                         | A draft per case, for review                                                       |
-| Test cases → **Create test cases from a prompt**           | Proposes cases from a description, one per checklist category (up to 10; 20 on Thorough) | Nothing until you tick and add them; they get `AI-` IDs and the `ai-generated` tag |
-| AI Assistant → Generate → **Skills** (`/skill-name`)       | Saved instructions (or an imported `SKILL.md`) applied to a prompt                       | Only the proposals; skills shape wording and scope, never the safety rules         |
-| Runs → failed case → **Ask AI why it failed**              | Says whether the test is out of date or the app is likely wrong                          | A corrected draft only for an out-of-date test; a likely defect changes nothing    |
-| Settings → AI assistant → **Teach the assistant your app** | Reads pages of the app (no clicks, no typing)                                            | Adds the page text to the private search index                                     |
+| Where                                                      | What                                                                                     | What it changes                                                                                                                         |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Test cases → **Generate** (row or bulk)                    | Drafts the automation for a case                                                         | A draft per case, for review                                                                                                            |
+| Test cases → **Create test cases from a prompt**           | Proposes cases from a description, one per checklist category (up to 10; 20 on Thorough) | Nothing until you tick and add them; they get the next IDs in the project's own format (`TC_01`, `TC_02`, …) and the `ai-generated` tag |
+| AI Assistant → Generate → **Skills** (`/skill-name`)       | Saved instructions (or an imported `SKILL.md`) applied to a prompt                       | Only the proposals; skills shape wording and scope, never the safety rules                                                              |
+| Runs → failed case → **Ask AI why it failed**              | Says whether the test is out of date or the app is likely wrong                          | A corrected draft only for an out-of-date test; a likely defect changes nothing                                                         |
+| Settings → AI assistant → **Teach the assistant your app** | Reads pages of the app (no clicks, no typing)                                            | Adds the page text to the private search index                                                                                          |
 
 Reading pages is enforced as read-only in the browser: after sign-in, every request that is not a read (`GET`, `HEAD`,
 `OPTIONS`) is refused, and the count is shown. A page that loads its data with `POST` may therefore look partly empty.

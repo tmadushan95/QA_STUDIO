@@ -297,20 +297,22 @@ export async function proposeOrAsk(input: ProposeInput): Promise<ProposeOutcome>
 export const AI_WORKBOOK = 'AI prompt';
 
 /**
- * Turn proposals into real test cases with fresh IDs (AI-0001, AI-0002, ... skipping any that exist) and an honest
- * source, so a report never mistakes them for rows from a workbook.
+ * Turn proposals into real test cases with fresh IDs and an honest source, so a report never mistakes them for rows
+ * from a workbook. `nextId` picks each ID from the IDs taken so far (existing ones plus those made in this call), so
+ * AI-written cases follow the same numbering as cases created by hand.
  */
 export function toTestCases(
   proposals: ProposedCase[],
-  opts: { existingIds: Set<string>; sheet?: string },
+  opts: {
+    existingIds: Set<string>;
+    nextId: (taken: ReadonlySet<string>) => string;
+    sheet?: string;
+  },
 ): TestCase[] {
   const taken = new Set(opts.existingIds);
   const sheet = opts.sheet ?? new Date().toISOString().slice(0, 10);
-  let n = 0;
   const next = () => {
-    do n++;
-    while (taken.has(`AI-${String(n).padStart(4, '0')}`));
-    const id = `AI-${String(n).padStart(4, '0')}`;
+    const id = opts.nextId(taken);
     taken.add(id);
     return id;
   };

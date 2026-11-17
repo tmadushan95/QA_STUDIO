@@ -44,6 +44,13 @@ const actions: ActionInfo[] = [
 ];
 const KNOWN = new Set(actions.map((a) => a.name));
 
+/** A stand-in for the app's ID rule: the lowest free TC_n. */
+const firstFreeId = (taken: ReadonlySet<string>) => {
+  let n = 1;
+  while (taken.has(`TC_${n}`)) n++;
+  return `TC_${n}`;
+};
+
 /** A validator like the real one: unknown actions are the problem. */
 const validate = (steps: StepDraft[]) => ({
   issues: steps.flatMap((s, i) =>
@@ -301,10 +308,12 @@ describe('prompt to test cases', () => {
       { title: 'Two', steps: ['c'], expectedResult: 'fine' },
     ];
     const made = toTestCases(proposals, {
-      existingIds: new Set(['AI-0001', 'AI-0003']),
+      existingIds: new Set(['TC_1', 'TC_3']),
+      nextId: firstFreeId,
       sheet: '2026-10-29',
     });
-    expect(made.map((c) => c.id)).toEqual(['AI-0002', 'AI-0004']);
+    // The generator sees the IDs made earlier in the same call, so the second case does not reuse TC_2.
+    expect(made.map((c) => c.id)).toEqual(['TC_2', 'TC_4']);
     expect(made[0]).toMatchObject({
       title: 'One',
       priority: 'High',
@@ -442,7 +451,7 @@ describe('prompt to test cases', () => {
           expectedResult: 'red',
         },
       ],
-      { existingIds: new Set() },
+      { existingIds: new Set(), nextId: firstFreeId },
     );
     expect(perm).toMatchObject({
       testType: 'Permission',

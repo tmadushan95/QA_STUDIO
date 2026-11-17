@@ -8,5 +8,5 @@ is done by the runner from Settings. Application packs remain possible but are o
 
 **Why.** The same tool tests any web application, and a new test case or screen needs no code change or release.
 
-**Status of migration.** The delete-project scenarios still use the delete-project pack; they are to be rewritten with
-generic steps (and then the pack removed) once they can be checked against a real environment.
+**Status of migration.** Done (2026-11-17). The delete-project scenarios were rewritten with generic steps and CAPEX custom
+steps, checked against a real environment, and the delete-project pack was removed.

@@ -4,6 +4,5 @@ export * from './generic/target.js';
 export * from './generic/actions.js';
 export * from './generic/convert.js';
 export * from './app-actions.js';
-export * from './delete-project-actions.js';
 export * from './signin.js';
 export * from './stub-app.js';

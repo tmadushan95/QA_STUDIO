@@ -6,7 +6,6 @@ import {
   LEGACY_PAGES,
   registerAppActions,
   registerGenericActions,
-  registerDeleteProjectActions,
 } from '@qa-studio/automation-core';
 import { PlaywrightExecutor, RunManager } from '@qa-studio/execution-engine';
 import { allowedEnvsFromEnv, ConfigError, createLogger, type Scenario } from '@qa-studio/shared';
@@ -145,11 +144,8 @@ connections.seedFromSettings(
   [...store.inventory.values()].flatMap((c) => (c.projectId === undefined ? [] : [c.projectId])),
 );
 
-// The generic step library works for any application. The application pack steps stay registered until its scenarios are
-// rewritten with generic steps, so the existing scenario files keep running.
-const registry = registerDeleteProjectActions(
-  registerAppActions(registerGenericActions(new ActionRegistry())),
-);
+// The generic step library works for any application; a project adds its own steps as custom steps (no code).
+const registry = registerAppActions(registerGenericActions(new ActionRegistry()));
 
 // Steps that delete data run only when this is switched on, and only against the configured test environment.
 const allowDestructive = process.env['QA_ALLOW_DESTRUCTIVE'] === 'true';

@@ -1,0 +1,670 @@
+<title>QA Studio Run Flow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; a lane diagram up top, a stage stepper, a live sentence→locator lab, then the folder map. Colors follow QA Studio's own tokens. */
+:root {
+  --page: #f4f6fb;
+  --surface: #ffffff;
+  --sunk: #eef1f8;
+  --border: #e2e8f2;
+  --border-strong: #cbd5e1;
+  --text: #0b1324;
+  --text-2: #44516a;
+  --muted: #5f6b82;
+  --primary: #3b4fe4;
+  --primary-soft: #eef1ff;
+  --primary-border: #c9d1ff;
+  --success: #0f7b47;
+  --success-soft: #e8f7ef;
+  --danger: #d92d20;
+  --danger-soft: #fef3f2;
+  --warning: #b54708;
+  --warning-soft: #fffaeb;
+  --code-bg: #0f172a;
+  --code-fg: #e2e8f0;
+  --code-key: #a5b4fc;
+  --code-str: #86efac;
+  --code-fn: #fcd34d;
+  --font-display: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0b1020; --surface: #121a2e; --sunk: #0e1527; --border: #233049; --border-strong: #33415e;
+    --text: #e8ecf6; --text-2: #b4bed3; --muted: #8d99b3;
+    --primary: #8b9bff; --primary-soft: #1b2350; --primary-border: #34408a;
+    --success: #4ad295; --success-soft: #0f2a1f; --danger: #ff7b6e; --danger-soft: #34140f;
+    --warning: #f5a65b; --warning-soft: #33210c;
+    --code-bg: #070b16; --code-fg: #e2e8f0; --code-key: #a5b4fc; --code-str: #86efac; --code-fn: #fcd34d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #0b1020; --surface: #121a2e; --sunk: #0e1527; --border: #233049; --border-strong: #33415e;
+  --text: #e8ecf6; --text-2: #b4bed3; --muted: #8d99b3;
+  --primary: #8b9bff; --primary-soft: #1b2350; --primary-border: #34408a;
+  --success: #4ad295; --success-soft: #0f2a1f; --danger: #ff7b6e; --danger-soft: #34140f;
+  --warning: #f5a65b; --warning-soft: #33210c;
+  --code-bg: #070b16; --code-fg: #e2e8f0; --code-key: #a5b4fc; --code-str: #86efac; --code-fn: #fcd34d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--page); color: var(--text);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+}
+.wrap {
+  max-width: 1040px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+  display: flex; flex-direction: column; gap: 56px;
+}
+h1, h2, h3 { font-family: var(--font-display); margin: 0; line-height: 1.2; text-wrap: balance; }
+h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 24px; font-weight: 600; }
+h3 { font-size: 17px; font-weight: 600; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
+.lede { color: var(--text-2); max-width: 68ch; font-size: 16.5px; }
+section { display: flex; flex-direction: column; gap: 20px; }
+.sec-head { display: flex; flex-direction: column; gap: 8px; }
+.sec-head p { color: var(--text-2); max-width: 68ch; }
+
+/* header */
+header { display: flex; flex-direction: column; gap: 16px; }
+.tldr {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px;
+}
+.tldr div {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+.tldr b { font-family: var(--font-display); font-size: 15px; }
+.tldr span { color: var(--text-2); font-size: 14px; }
+
+/* architecture lanes */
+.arch { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; }
+.node {
+  flex: 1 1 150px; min-width: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.node.hl { border-color: var(--primary-border); background: var(--primary-soft); }
+.node .tag { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.node b { font-family: var(--font-display); font-size: 16px; }
+.node p { font-size: 13.5px; color: var(--text-2); }
+.node code { font-size: 11.5px; color: var(--muted); word-break: break-all; }
+.arrow { flex: 0 0 28px; display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 20px; }
+.side-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.side {
+  background: var(--sunk); border: 1px dashed var(--border-strong); border-radius: 10px; padding: 12px 14px;
+  display: flex; gap: 10px; align-items: flex-start; min-width: 0;
+}
+.side .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 7px; flex: 0 0 10px; }
+.side p { font-size: 14px; color: var(--text-2); }
+.side b { color: var(--text); }
+@media (max-width: 720px) {
+  .arch { flex-direction: column; }
+  .arrow { flex-basis: 26px; transform: rotate(90deg); }
+}
+
+/* stepper */
+.stepper { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
+.steps-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.steps-list button {
+  width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; cursor: pointer; color: var(--text); font: inherit; font-size: 14px;
+  display: flex; gap: 10px; align-items: center;
+}
+.steps-list button:hover { border-color: var(--primary-border); }
+.steps-list button[aria-selected="true"] { background: var(--primary-soft); border-color: var(--primary); }
+.steps-list .n {
+  flex: 0 0 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--sunk); color: var(--text-2); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.steps-list button[aria-selected="true"] .n { background: var(--primary); color: var(--surface); }
+.steps-list .who { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px;
+  display: flex; flex-direction: column; gap: 14px; min-width: 0;
+}
+.panel .where { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font-family: var(--font-mono); font-size: 12px; background: var(--sunk); border: 1px solid var(--border);
+  padding: 3px 8px; border-radius: 6px; color: var(--text-2); word-break: break-all;
+}
+.panel ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--text-2); }
+.panel li b { color: var(--text); }
+.note {
+  border-radius: 8px; padding: 10px 12px; font-size: 14px;
+  background: var(--warning-soft); color: var(--text); border: 1px solid var(--border);
+}
+.note.good { background: var(--success-soft); }
+.nav-btns { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.btn {
+  font: inherit; font-size: 14px; font-weight: 500; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface); color: var(--text);
+}
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--surface); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 760px) { .stepper { grid-template-columns: 1fr; } .steps-list .who { display: none; } }
+
+/* code */
+pre {
+  margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 14px 16px;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6; overflow-x: auto; white-space: pre;
+}
+pre .k { color: var(--code-key); } pre .s { color: var(--code-str); } pre .f { color: var(--code-fn); } pre .c { color: #7c8aa5; }
+
+/* lab */
+.lab { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.lab label { font-weight: 600; font-size: 14px; }
+.input-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.input-row input {
+  flex: 1 1 280px; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--border-strong); background: var(--page); color: var(--text);
+}
+.samples { display: flex; flex-wrap: wrap; gap: 6px; }
+.samples button {
+  font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--primary-border); background: var(--primary-soft); color: var(--text);
+}
+.pipeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stage { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.stage .lbl { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.stage .lbl i { font-style: normal; width: 20px; height: 20px; border-radius: 50%; background: var(--primary); color: var(--surface); display: grid; place-items: center; font-size: 11px; }
+.stage .file { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.stage pre { font-size: 12.5px; flex: 1; }
+.stage .explain { font-size: 13.5px; color: var(--text-2); }
+.html-demo {
+  flex: 1; border: 1px dashed var(--border-strong); border-radius: 10px; padding: 14px; background: var(--page);
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start; font-size: 14px;
+}
+.html-demo .fake-btn { background: var(--primary); color: var(--surface); padding: 6px 12px; border-radius: 6px; font-weight: 500; }
+.html-demo .fake-field { display: flex; flex-direction: column; gap: 4px; }
+.html-demo .fake-input { border: 1px solid var(--border-strong); background: var(--surface); border-radius: 6px; padding: 5px 10px; min-width: 140px; }
+.html-demo .ring { outline: 2px solid var(--success); outline-offset: 3px; }
+.html-demo .toast { background: var(--success-soft); color: var(--success); border-radius: 6px; padding: 6px 10px; font-weight: 500; }
+.html-demo table { border-collapse: collapse; font-size: 13px; }
+.html-demo td { border-bottom: 1px solid var(--border); padding: 4px 10px 4px 0; }
+.html-demo .muted { color: var(--muted); font-size: 12.5px; }
+.unmatched { background: var(--danger-soft); border-radius: 10px; padding: 14px 16px; color: var(--text); font-size: 14.5px; }
+@media (max-width: 900px) { .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .pipeline { grid-template-columns: 1fr; } }
+
+/* priority table */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+table.grid { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.grid th, table.grid td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+table.grid th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; background: var(--sunk); }
+table.grid tr:last-child td { border-bottom: 0; }
+table.grid td:first-child { font-variant-numeric: tabular-nums; color: var(--muted); width: 40px; }
+
+/* tree */
+.tree-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; }
+.tree {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.85; overflow-x: auto; min-width: 0;
+}
+.tree .row { white-space: nowrap; display: flex; gap: 10px; align-items: baseline; }
+.tree .d { color: var(--text); font-weight: 500; }
+.tree .x { color: var(--muted); font-family: var(--font-body); font-size: 12.5px; white-space: normal; }
+.tree .key { color: var(--primary); font-weight: 600; }
+.tree .ind1 { padding-left: 18px; } .tree .ind2 { padding-left: 36px; } .tree .ind3 { padding-left: 54px; } .tree .ind4 { padding-left: 72px; }
+.art-box { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.files { display: flex; flex-direction: column; gap: 8px; }
+.file-row {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+  display: flex; gap: 10px; align-items: baseline; min-width: 0;
+}
+.file-row code { color: var(--text); white-space: nowrap; }
+.file-row span { color: var(--text-2); font-size: 13.5px; }
+@media (max-width: 820px) { .tree-grid { grid-template-columns: 1fr; } }
+
+/* glossary */
+dl.gloss { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 0; }
+dl.gloss div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+dl.gloss dt { font-family: var(--font-display); font-weight: 600; }
+dl.gloss dd { margin: 4px 0 0; color: var(--text-2); font-size: 14px; }
+
+button:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+footer { color: var(--muted); font-size: 13px; }
+</style>
+
+<div class="wrap">
+
+<header>
+  <span class="eyebrow">QA Studio · how a test case runs</span>
+  <h1>From a written test case to a real browser click</h1>
+  <p class="lede">QA Studio never writes Playwright script files. It turns each test case into a short list of steps stored as data, and the worker runs them with Playwright functions that are written once. This page follows one test case through every stage and shows which folder does what.</p>
+  <div class="tldr">
+    <div><b>1. Steps are data</b><span>"Click the Save button" becomes <code>{ action: "click", target: { role: "button", name: "Save" } }</code>.</span></div>
+    <div><b>2. Playwright code is fixed</b><span>Each action (click, fill, open…) is one small function that already holds the Playwright code.</span></div>
+    <div><b>3. Run = data + functions</b><span>At run time each step picks its function, builds a locator and acts in the browser.</span></div>
+  </div>
+</header>
+
+<!-- ARCHITECTURE -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">The big picture</span>
+    <h2>Who talks to whom</h2>
+    <p>Your browser only ever talks to the .NET API. Anything that needs Playwright, Excel or AI is forwarded to the Node worker, which drives a real browser against the app you are testing.</p>
+  </div>
+  <div class="arch" role="list">
+    <div class="node" role="listitem"><span class="tag">You</span><b>Frontend</b><p>React UI. Pick cases and accounts, press Run, read results.</p><code>Frontend/</code></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><span class="tag">Gateway</span><b>.NET API</b><p>The one address the browser uses. Forwards runs to the worker.</p><code>Backend/src/API/Gateway/WorkerGateway.cs</code></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node hl" role="listitem"><span class="tag">Worker</span><b>Node qa-api</b><p>Routes, run queue, step library. This is where Playwright lives.</p><code>Backend/Worker/</code></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><span class="tag">Playwright 1.58</span><b>Chromium / Firefox / WebKit</b><p>A real browser that opens your app, signs in and runs the steps.</p><code>chromium.launch()</code></div>
+    <div class="arrow" aria-hidden="true">→</div>
+    <div class="node" role="listitem"><span class="tag">Under test</span><b>Your web app</b><p>The address from the project's settings (<code>appUrl</code>).</p><code>https://myapp.test</code></div>
+  </div>
+  <div class="side-row">
+    <div class="side"><span class="dot" style="background:var(--primary)"></span><p><b>SQL Server</b> stores test cases, approved steps, accounts and run history. The worker reads and saves through the .NET API and keeps no database of its own.</p></div>
+    <div class="side"><span class="dot" style="background:var(--warning)"></span><p><b>Artifacts folder</b> on disk holds screenshots and traces from failed cases: <code>Backend/Worker/artifacts/</code>.</p></div>
+    <div class="side"><span class="dot" style="background:var(--success)"></span><p><b>Secret key</b> decrypts test-account passwords: <code>Backend/Worker/data/secret.key</code>. It stays separate from the database.</p></div>
+  </div>
+</section>
+
+<!-- STAGES -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">End to end</span>
+    <h2>One test case, stage by stage</h2>
+    <p>Example test case: <b>Create a project</b>. Step through what happens and which file does it.</p>
+  </div>
+  <div class="stepper">
+    <ul class="steps-list" role="tablist" aria-label="Stages" id="stageTabs"></ul>
+    <div class="panel" role="tabpanel" id="stagePanel" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- LAB -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Try it</span>
+    <h2>Sentence → step → locator → browser</h2>
+    <p>Type a test step the way a tester would. The page uses the same patterns as <code>convert.ts</code> and the same locator choice as <code>target.ts</code>, so you can see exactly what QA Studio would run.</p>
+  </div>
+  <div class="lab">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <label for="sentence">Written step</label>
+      <div class="input-row">
+        <input id="sentence" type="text" autocomplete="off" spellcheck="false" value="Click the New project button">
+      </div>
+      <div class="samples" id="samples" aria-label="Example sentences"></div>
+    </div>
+    <div id="labOut"></div>
+  </div>
+</section>
+
+<!-- PRIORITY -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Locator rules</span>
+    <h2>How a target picks its Playwright locator</h2>
+    <p>A target describes an element the way a person or a screen reader would, never by CSS class or XPath. <code>locate()</code> uses the <b>first</b> field that is filled in, in this order, then adds <code>.first()</code> (or <code>.nth(n)</code>).</p>
+  </div>
+  <div class="table-wrap">
+    <table class="grid">
+      <thead><tr><th>#</th><th>Target field</th><th>Playwright call</th><th>Finds, for example</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><code>testId</code></td><td><code>getByTestId("save")</code></td><td><code>&lt;button data-testid="save"&gt;</code></td></tr>
+        <tr><td>2</td><td><code>role</code> + <code>name</code></td><td><code>getByRole("button", { name: "Save" })</code></td><td><code>&lt;button&gt;Save&lt;/button&gt;</code> or an icon button with <code>aria-label="Save"</code></td></tr>
+        <tr><td>3</td><td><code>label</code></td><td><code>getByLabel("Name")</code></td><td>The input tied to <code>&lt;label&gt;Name&lt;/label&gt;</code></td></tr>
+        <tr><td>4</td><td><code>placeholder</code></td><td><code>getByPlaceholder("Search…")</code></td><td><code>&lt;input placeholder="Search…"&gt;</code></td></tr>
+        <tr><td>5</td><td><code>text</code></td><td><code>getByText("Project saved")</code></td><td>Any element showing that text</td></tr>
+        <tr><td>+</td><td><code>within</code></td><td>Find the container first, then search inside it</td><td>"The Delete button in the row containing PRJ-001"</td></tr>
+        <tr><td>+</td><td><code>exact</code>, <code>nth</code></td><td>Whole-text match; pick the 2nd, 3rd… match</td><td>When several elements fit</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- FOLDERS -->
+<section>
+  <div class="sec-head">
+    <span class="eyebrow">Folder map</span>
+    <h2>Where each piece lives</h2>
+    <p>Highlighted names are the files you open first when you want to understand or change how runs work.</p>
+  </div>
+  <div class="tree-grid">
+    <div class="tree" aria-label="Folder tree">
+      <div class="row"><span class="d">QA_STUDIO/</span></div>
+      <div class="row ind1"><span class="d">Frontend/</span><span class="x">React UI</span></div>
+      <div class="row ind1"><span class="d">Backend/src/</span></div>
+      <div class="row ind2"><span class="d">API/</span><span class="x">.NET API, the browser's only address</span></div>
+      <div class="row ind2"><span class="d">AppHost/</span><span class="x">Aspire host that starts API, worker and UI</span></div>
+      <div class="row ind1"><span class="d">Backend/Worker/</span><span class="x">Node worker (its working folder)</span></div>
+      <div class="row ind2"><span class="d">services/qa-api/src/</span></div>
+      <div class="row ind3"><span class="key">server.ts</span><span class="x">wires everything; sets the artifacts folder</span></div>
+      <div class="row ind3"><span class="key">app.ts</span><span class="x">routes: /api/runs, /api/scenarios, artifacts</span></div>
+      <div class="row ind3"><span class="d">conversions.ts</span><span class="x">bulk "English → steps" job</span></div>
+      <div class="row ind3"><span class="d">ai-tasks.ts</span><span class="x">AI drafting jobs</span></div>
+      <div class="row ind2"><span class="d">packages/execution-engine/src/</span></div>
+      <div class="row ind3"><span class="key">run-manager.ts</span><span class="x">queue and workers, one account at a time</span></div>
+      <div class="row ind3"><span class="key">playwright-executor.ts</span><span class="x">launch, sign in, trace, screenshot</span></div>
+      <div class="row ind2"><span class="d">packages/automation-core/src/</span></div>
+      <div class="row ind3"><span class="key">scenario.ts</span><span class="x">validates, then runs steps in order</span></div>
+      <div class="row ind3"><span class="d">registry.ts</span><span class="x">list of all actions; page specs</span></div>
+      <div class="row ind3"><span class="d">signin.ts</span><span class="x">signs in to the app</span></div>
+      <div class="row ind3"><span class="d">generic/</span></div>
+      <div class="row ind4"><span class="key">convert.ts</span><span class="x">sentence patterns → steps</span></div>
+      <div class="row ind4"><span class="key">target.ts</span><span class="x">target → Playwright locator</span></div>
+      <div class="row ind4"><span class="key">actions.ts</span><span class="x">click, fill, open… (Playwright code)</span></div>
+      <div class="row ind2"><span class="d">packages/agents/src/generator.ts</span><span class="x">AI writes steps</span></div>
+      <div class="row ind2"><span class="d">artifacts/</span><span class="x">run evidence (git-ignored)</span></div>
+      <div class="row ind2"><span class="d">data/secret.key</span><span class="x">password decryption key</span></div>
+    </div>
+    <div class="art-box">
+      <h3>Inside the artifacts folder</h3>
+      <p style="color:var(--text-2);font-size:14px">The default path is <code>Backend/Worker/artifacts</code>. To move it, set <code>QA_ARTIFACTS_DIR</code> in <code>Backend/Worker/.env</code>.</p>
+      <pre><span class="c">artifacts/</span>
+  <span class="k">&lt;runId&gt;</span>/                      <span class="c">one folder per run</span>
+    <span class="k">&lt;caseId&gt;</span>--<span class="k">&lt;account&gt;</span>/       <span class="c">one per case × account</span>
+      failure.png
+      failure-page.txt
+      trace.zip
+      sign-in-failed.png</pre>
+      <div class="files">
+        <div class="file-row"><code>failure.png</code><span>Screenshot at the moment a step failed.</span></div>
+        <div class="file-row"><code>failure-page.txt</code><span>Text outline of the page (buttons, headings, text), passwords masked. The AI diagnosis reads this.</span></div>
+        <div class="file-row"><code>trace.zip</code><span>Full recording. Open it with <code>npx playwright show-trace trace.zip</code>.</span></div>
+        <div class="file-row"><code>sign-in-failed.png</code><span>Screenshot when sign-in failed.</span></div>
+      </div>
+      <div class="note good">A case that passes leaves its folder empty: the trace is thrown away to save space.</div>
+    </div>
+  </div>
+</section>
+
+<!-- GLOSSARY -->
+<section>
+  <div class="sec-head"><span class="eyebrow">Words used here</span><h2>Glossary</h2></div>
+  <dl class="gloss">
+    <div><dt>Test case (TC)</dt><dd>What a tester writes in plain English: steps and expected results.</dd></div>
+    <div><dt>Scenario / steps</dt><dd>The same test case as a list of <code>{ action, params }</code> records, stored in SQL Server. A draft until someone approves it.</dd></div>
+    <div><dt>Action</dt><dd>One kind of step (click, fill, open, assert-text…). Each is a function in <code>actions.ts</code> holding the Playwright code.</dd></div>
+    <div><dt>Target</dt><dd>How to find an element: role, name, label, placeholder, text or test id. Never CSS or XPath.</dd></div>
+    <div><dt>Locator</dt><dd>Playwright's handle to an element, for example <code>page.getByRole("button", { name: "Save" })</code>.</dd></div>
+    <div><dt>Run mode</dt><dd><b>Concurrent</b>: fresh browser per case. <b>Clean</b>: one browser, a new window per case, signs in once. <b>Shared</b>: one window per account, reused.</dd></div>
+    <div><dt>Blocked</dt><dd>The case did not run: a bad step, missing data, a missing password or failed sign-in.</dd></div>
+    <div><dt>Destructive step</dt><dd>A step that deletes or changes data. It runs only when <code>QA_ALLOW_DESTRUCTIVE=true</code>.</dd></div>
+  </dl>
+</section>
+
+<footer>Based on the QA Studio source: <code>Backend/Worker</code> (execution-engine, automation-core, agents, qa-api).</footer>
+</div>
+
+<script>
+(function () {
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* ---------- Stages ---------- */
+  const STAGES = [
+    {
+      t: 'Tester writes the case', who: 'You',
+      files: ['Frontend/', 'SQL Server'],
+      body: `<p>The test case is written in plain English, or imported from Excel. Playwright cannot read this yet.</p>
+<pre><span class="c">Test case: Create a project</span>
+1. Open /projects
+2. Click the New project button
+3. Enter Alpha in the Name field
+4. Click the Save button      <span class="c">Expected: Message "Project saved" appears</span></pre>`
+    },
+    {
+      t: 'English becomes steps', who: 'Rules / AI / you',
+      files: ['generic/convert.ts', 'qa-api/src/conversions.ts', 'agents/src/generator.ts'],
+      body: `<p>Each sentence becomes one structured step, in one of three ways:</p>
+<ul>
+<li><b>Rules (no AI).</b> <code>convertTestCase()</code> tries regex patterns in order, and the first match wins. Sentences no pattern matches are listed as "still to convert".</li>
+<li><b>AI draft.</b> <code>generateScenario()</code> gives the model the test case and the list of allowed actions. The model answers with steps in the same format, the platform validates them, and the model fixes any errors (up to 2 retries).</li>
+<li><b>By hand.</b> A person edits steps in the step editor.</li>
+</ul>
+<pre>[
+  { <span class="k">"action"</span>: <span class="s">"open"</span>,        <span class="k">"params"</span>: { <span class="k">"path"</span>: <span class="s">"/projects"</span> } },
+  { <span class="k">"action"</span>: <span class="s">"click"</span>,       <span class="k">"params"</span>: { <span class="k">"target"</span>: { <span class="k">"role"</span>: <span class="s">"button"</span>, <span class="k">"name"</span>: <span class="s">"New project"</span> } } },
+  { <span class="k">"action"</span>: <span class="s">"fill"</span>,        <span class="k">"params"</span>: { <span class="k">"target"</span>: { <span class="k">"label"</span>: <span class="s">"Name"</span> }, <span class="k">"value"</span>: <span class="s">"Alpha"</span> } },
+  { <span class="k">"action"</span>: <span class="s">"click"</span>,       <span class="k">"params"</span>: { <span class="k">"target"</span>: { <span class="k">"role"</span>: <span class="s">"button"</span>, <span class="k">"name"</span>: <span class="s">"Save"</span> } } },
+  { <span class="k">"action"</span>: <span class="s">"assert-text"</span>, <span class="k">"params"</span>: { <span class="k">"text"</span>: <span class="s">"Project saved"</span> } }
+]</pre>
+<div class="note">The AI writes data, not code. It can only choose from the approved actions.</div>`
+    },
+    {
+      t: 'A person approves', who: 'You',
+      files: ['POST /api/scenarios/:caseId/approve', 'app.ts'],
+      body: `<p>Every route above saves a <b>draft</b>. Nothing runs until someone approves it. Only the approved step list is used in runs, and an existing approved list is never overwritten by a conversion.</p>
+<div class="note good">"Approve all ready" approves every draft that passed validation in one go.</div>`
+    },
+    {
+      t: 'Run is started', who: 'API → worker',
+      files: ['POST /api/runs (app.ts:735)', 'run-manager.ts'],
+      body: `<ul>
+<li>The UI asks <code>POST /api/runs/plan</code> which accounts each project needs, then sends <code>POST /api/runs</code>.</li>
+<li>The worker checks the project is set up and accounts were chosen, then makes <b>one job per case × account</b>.</li>
+<li><code>RunManager</code> runs up to 16 jobs at once, but never the same account in two browsers (to avoid lock-outs). Every change is saved to SQL Server.</li>
+</ul>`
+    },
+    {
+      t: 'Browser opens and signs in', who: 'Playwright',
+      files: ['playwright-executor.ts → execute()', 'signin.ts'],
+      body: `<p>The executor reads the project's settings fresh for each case (app URL, browser, headless, timeout), then:</p>
+<pre><span class="k">const</span> browser = <span class="k">await</span> chromium.<span class="f">launch</span>({ headless, slowMo });
+<span class="k">const</span> context = <span class="k">await</span> browser.<span class="f">newContext</span>({ baseURL: appUrl });
+<span class="k">const</span> page    = <span class="k">await</span> context.<span class="f">newPage</span>();
+<span class="k">await</span> <span class="f">signIn</span>(page, settings.login, credentials);   <span class="c">// before tracing!</span>
+<span class="k">await</span> context.tracing.<span class="f">start</span>({ screenshots: <span class="k">true</span>, snapshots: <span class="k">true</span> });</pre>
+<div class="note">Sign-in happens <b>before</b> tracing starts, so the password is never recorded in <code>trace.zip</code>.</div>`
+    },
+    {
+      t: 'Steps are checked, then run', who: 'automation-core',
+      files: ['scenario.ts → runScenario()', 'registry.ts'],
+      body: `<p><b>First, every step is checked.</b> Does the action exist? Are the params valid? Is <code>{{data.x}}</code> filled? Is the step destructive without permission? If anything is wrong, the case is <b>Blocked</b> and the browser does nothing.</p>
+<p><b>Then the steps run in order:</b></p>
+<pre><span class="k">for</span> (<span class="k">const</span> step <span class="k">of</span> steps) {
+  <span class="k">const</span> def = registry.<span class="f">get</span>(step.action);  <span class="c">// e.g. the "click" action</span>
+  <span class="k">await</span> def.<span class="f">run</span>(ctx, step.params);          <span class="c">// timeout = 2 × project timeout</span>
+}</pre>
+<p>After the first failure, the remaining steps are marked <b>Skipped</b>.</p>`
+    },
+    {
+      t: 'Each step becomes a locator', who: 'target.ts',
+      files: ['generic/actions.ts', 'generic/target.ts → locate()'],
+      body: `<p>The <code>click</code> action already holds the Playwright code. It calls <code>locate()</code>, which turns the target into a locator:</p>
+<pre><span class="c">// actions.ts — written once, used by every test case</span>
+<span class="k">async</span> <span class="f">run</span>(ctx, { target }) {
+  <span class="k">await</span> <span class="f">locate</span>(ctx.page, target).<span class="f">click</span>({ timeout });
+}
+
+<span class="c">// target = { role: "button", name: "New project" }  →  becomes</span>
+page.<span class="f">getByRole</span>(<span class="s">"button"</span>, { name: <span class="s">"New project"</span> }).<span class="f">first</span>().<span class="f">click</span>()</pre>
+<p>Put together, the whole test case runs as if someone had written:</p>
+<pre><span class="k">await</span> page.<span class="f">goto</span>(<span class="s">"https://myapp.test/projects"</span>);
+<span class="k">await</span> page.<span class="f">getByRole</span>(<span class="s">"button"</span>, { name: <span class="s">"New project"</span> }).<span class="f">first</span>().<span class="f">click</span>();
+<span class="k">await</span> page.<span class="f">getByLabel</span>(<span class="s">"Name"</span>).<span class="f">first</span>().<span class="f">fill</span>(<span class="s">"Alpha"</span>);
+<span class="k">await</span> page.<span class="f">getByRole</span>(<span class="s">"button"</span>, { name: <span class="s">"Save"</span> }).<span class="f">first</span>().<span class="f">click</span>();
+<span class="c">// wait until visible:</span> page.<span class="f">getByText</span>(<span class="s">"Project saved"</span>).<span class="f">first</span>()</pre>
+<div class="note">This code is never saved to a file. It is put together live from the steps on every run.</div>`
+    },
+    {
+      t: 'Result and artifacts', who: 'Disk + UI',
+      files: ['artifacts/<runId>/<case>--<account>/', 'GET /api/runs/:id/artifact'],
+      body: `<ul>
+<li><b>Passed:</b> the trace is discarded and the case folder stays empty.</li>
+<li><b>Failed:</b> the worker saves <code>failure.png</code>, <code>failure-page.txt</code> and <code>trace.zip</code>.</li>
+<li><b>Sign-in failed:</b> the worker saves <code>sign-in-failed.png</code>, and the account is not retried in this run, to avoid locking it.</li>
+</ul>
+<p>The UI fetches these files through <code>GET /api/runs/:id/artifact?path=…</code>. It can only serve files the run itself reported, from inside that run's folder.</p>`
+    }
+  ];
+
+  const tabs = document.getElementById('stageTabs');
+  const panel = document.getElementById('stagePanel');
+  let current = 0;
+  STAGES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button role="tab" id="st-${i}" aria-controls="stagePanel"><span class="n">${i + 1}</span><span>${esc(s.t)}</span><span class="who">${esc(s.who)}</span></button>`;
+    li.firstChild.addEventListener('click', () => show(i));
+    tabs.appendChild(li);
+  });
+  function show(i) {
+    current = i;
+    tabs.querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-selected', String(j === i)));
+    const s = STAGES[i];
+    panel.innerHTML = `<span class="eyebrow">Stage ${i + 1} of ${STAGES.length}</span><h3>${esc(s.t)}</h3>
+      <div class="where">${s.files.map((f) => `<span class="chip">${esc(f)}</span>`).join('')}</div>
+      ${s.body}
+      <div class="nav-btns"><button class="btn" id="prevSt" ${i === 0 ? 'disabled' : ''}>← Back</button>
+      <button class="btn primary" id="nextSt" ${i === STAGES.length - 1 ? 'disabled' : ''}>Next stage →</button></div>`;
+    panel.querySelector('#prevSt').onclick = () => show(Math.max(0, current - 1));
+    panel.querySelector('#nextSt').onclick = () => show(Math.min(STAGES.length - 1, current + 1));
+  }
+  show(0);
+
+  /* ---------- Lab: a JS mirror of convert.ts + target.ts ---------- */
+  const PAGES = { 'Draft projects': { route: '/projects/draft-list', marker: 'Draft projects' } };
+  const clean = (s) => s.trim().replace(/[.;]+$/, '').replace(/^["'“‘](.*)["'”’]$/, '$1').trim();
+  const ROLE_WORDS = { button: 'button', link: 'link', tab: 'tab', 'menu item': 'menuitem', menu: 'menuitem', checkbox: 'checkbox', icon: 'button' };
+  const RULES = [
+    { name: 'sign-in', f: (l) => (/^(log ?in|sign ?in|login)\b/i.test(l) ? 'sign-in' : null) },
+    { name: '"open/go to" + a path', f: (l) => { const m = /^(?:open|navigate to|go to|browse to|visit)\s+(\/\S*)$/i.exec(l); return m ? { action: 'open', params: { path: m[1] } } : null; } },
+    { name: '"go to" + a page from Settings › Pages', f: (l) => {
+      const m = /^(?:open|navigate to|go to|visit)\s+(?:the\s+)?(.+?)(?:\s+page|\s+screen)?$/i.exec(l); if (!m) return null;
+      const want = clean(m[1]).toLowerCase();
+      const key = Object.keys(PAGES).find((k) => k.toLowerCase() === want || k.toLowerCase().replace(/-/g, ' ') === want);
+      return key ? { action: 'go-to-page', params: { page: key } } : null; } },
+    { name: '"enter X in Y (field)"', f: (l) => { const m = /^(?:enter|type|input|fill in|fill)\s+(.+?)\s+(?:in|into|in the|into the)\s+(?:the\s+)?(.+?)(?:\s+(?:field|box|textbox|input))?$/i.exec(l); return m ? { action: 'fill', params: { target: { label: clean(m[2]) }, value: clean(m[1]) } } : null; } },
+    { name: '"select X from Y (dropdown)"', f: (l) => { const m = /^(?:select|choose|pick)\s+(.+?)\s+(?:from|in)\s+(?:the\s+)?(.+?)(?:\s+(?:dropdown|drop-down|list|menu))?$/i.exec(l); return m ? { action: 'select', params: { target: { label: clean(m[2]) }, option: clean(m[1]) } } : null; } },
+    { name: '"tick X checkbox"', f: (l) => { const m = /^(?:tick|check|enable)\s+(?:the\s+)?(.+?)\s+checkbox$/i.exec(l); return m ? { action: 'check', params: { target: { label: clean(m[1]) } } } : null; } },
+    { name: '"click X (button/link/tab/menu/icon)"', f: (l) => { const m = /^(?:click|tap|press|select)\s+(?:on\s+)?(?:the\s+)?(.+?)(?:\s+(button|link|tab|menu item|menu|icon))?$/i.exec(l); if (!m) return null; const role = ROLE_WORDS[(m[2] || 'button').toLowerCase()] || 'button'; return { action: 'click', params: { target: { role, name: clean(m[1]) } } }; } },
+    { name: '"verify X is not displayed"', f: (l) => { const m = /^(?:verify|check|ensure|confirm|validate)\s+(?:that\s+)?(?:the\s+)?(.+?)\s+(?:is not|isn't|are not|is no longer)\s+(?:displayed|shown|visible|present)$/i.exec(l); return m ? { action: 'assert-no-text', params: { text: clean(m[1]) } } : null; } },
+    { name: '"verify X is displayed"', f: (l) => { const m = /^(?:verify|check|ensure|confirm|validate)\s+(?:that\s+)?(?:the\s+)?(?:message\s+)?(.+?)\s+(?:is\s+|are\s+)?(?:displayed|shown|visible|appears|is present)$/i.exec(l); return m ? { action: 'assert-text', params: { text: clean(m[1]) } } : null; } },
+  ];
+  function convert(line) {
+    const l = line.trim();
+    const quoted = /["“]([^"”]{2,200})["”]/.exec(l);
+    // Expected-result style: a quoted phrase that isn't an action sentence → assert-text (as convert.ts does for "Expected").
+    for (const r of RULES) { const out = r.f(l); if (out) return { rule: r.name, out }; }
+    if (quoted) return { rule: 'quoted text in an expected result', out: { action: 'assert-text', params: { text: quoted[1] } } };
+    return null;
+  }
+
+  const q = (s) => `<span class="s">"${esc(s)}"</span>`;
+  function locatorCode(t) {
+    let root = 'page';
+    if (t.within) {
+      const w = t.within;
+      let sc = w.testId ? `page.<span class="f">getByTestId</span>(${q(w.testId)})` : w.role ? `page.<span class="f">getByRole</span>(${q(w.role)}${w.name ? `, { name: ${q(w.name)} }` : ''})` : `page.<span class="f">getByText</span>(${q(w.text)})`;
+      if (w.text && w.role) sc += `\n  .<span class="f">filter</span>({ hasText: ${q(w.text)} })`;
+      root = sc + `.<span class="f">first</span>()\n  `;
+    }
+    let c;
+    if (t.testId) c = `.<span class="f">getByTestId</span>(${q(t.testId)})`;
+    else if (t.role) c = `.<span class="f">getByRole</span>(${q(t.role)}${t.name ? `, { name: ${q(t.name)} }` : ''})`;
+    else if (t.label) c = `.<span class="f">getByLabel</span>(${q(t.label)})`;
+    else if (t.placeholder) c = `.<span class="f">getByPlaceholder</span>(${q(t.placeholder)})`;
+    else c = `.<span class="f">getByText</span>(${q(t.text)})`;
+    return root + c.replace(/^\./, root === 'page' ? '.' : '.') + `.<span class="f">first</span>()`;
+  }
+  function pickedField(t) { return t.testId ? 'testId' : t.role ? 'role + name' : t.label ? 'label' : t.placeholder ? 'placeholder' : 'text'; }
+
+  function playwright(step) {
+    const p = step.params;
+    switch (step.action) {
+      case 'open': return { code: `<span class="k">await</span> page.<span class="f">goto</span>(<span class="s">"https://myapp.test${esc(p.path)}"</span>);`, why: 'No element to find: the action joins the path to the app URL and navigates.' };
+      case 'go-to-page': { const s = PAGES[p.page]; return { code: `<span class="k">await</span> page.<span class="f">goto</span>(<span class="s">"https://myapp.test${esc(s.route)}"</span>);\n<span class="c">// then wait until visible:</span>\npage.<span class="f">getByText</span>(${q(s.marker)}).<span class="f">first</span>()`, why: 'Route and marker text come from Settings › Pages.' }; }
+      case 'click': return { code: `<span class="k">await</span> ${locatorCode(p.target)}\n  .<span class="f">click</span>();`, why: `locate() picked <b>${pickedField(p.target)}</b>, so it uses getByRole.` };
+      case 'fill': return { code: `<span class="k">await</span> ${locatorCode(p.target)}\n  .<span class="f">fill</span>(${q(p.value)});`, why: `locate() picked <b>${pickedField(p.target)}</b>, so it uses getByLabel.` };
+      case 'select': return { code: `<span class="k">await</span> ${locatorCode(p.target)}\n  .<span class="f">selectOption</span>(${q(p.option)});`, why: `locate() picked <b>${pickedField(p.target)}</b>, so it uses getByLabel.` };
+      case 'check': return { code: `<span class="k">await</span> ${locatorCode(p.target)}\n  .<span class="f">check</span>();`, why: `locate() picked <b>${pickedField(p.target)}</b>, so it uses getByLabel.` };
+      case 'assert-text': return { code: `<span class="c">// wait until visible, else fail</span>\npage.<span class="f">getByText</span>(${q(p.text)}).<span class="f">first</span>()`, why: 'Passes when the text shows up before the timeout.' };
+      case 'assert-no-text': return { code: `<span class="c">// wait until hidden, else fail</span>\npage.<span class="f">getByText</span>(${q(p.text)}).<span class="f">first</span>()`, why: 'Passes when the text is gone (or never appears).' };
+    }
+  }
+
+  function demo(step) {
+    const p = step.params;
+    switch (step.action) {
+      case 'open': case 'go-to-page': return `<span class="muted">Browser address bar</span><div class="fake-input mono">https://myapp.test${esc(step.action === 'open' ? p.path : PAGES[p.page].route)}</div>`;
+      case 'click': {
+        const t = p.target;
+        if (t.within) return `<span class="muted">Table on the page</span><table><tr><td>PRJ-000</td><td><span class="fake-btn">Delete</span></td></tr><tr><td><b>${esc(t.within.text)}</b></td><td><span class="fake-btn ring">${esc(t.name)}</span></td></tr></table><span class="muted">Only the button inside the matching row is used.</span>`;
+        if (t.role === 'link') return `<span class="muted">&lt;a href="…"&gt;</span><a class="ring" style="color:var(--primary)">${esc(t.name)}</a>`;
+        if (t.role === 'tab') return `<span class="muted">&lt;button role="tab"&gt;</span><span class="fake-input ring">${esc(t.name)}</span>`;
+        if (t.role === 'menuitem') return `<span class="muted">&lt;li role="menuitem"&gt;</span><span class="fake-input ring">${esc(t.name)}</span>`;
+        return `<span class="muted">&lt;button&gt;${esc(t.name)}&lt;/button&gt;</span><span class="fake-btn ring">${esc(t.name)}</span><span class="muted">An icon button with aria-label="${esc(t.name)}" matches too.</span>`;
+      }
+      case 'fill': return `<span class="muted">&lt;label&gt;${esc(p.target.label)}&lt;/label&gt;&lt;input&gt;</span><div class="fake-field"><span>${esc(p.target.label)}</span><span class="fake-input ring">${esc(p.value)}</span></div>`;
+      case 'select': return `<span class="muted">&lt;label&gt;${esc(p.target.label)}&lt;/label&gt;&lt;select&gt;</span><div class="fake-field"><span>${esc(p.target.label)}</span><span class="fake-input ring">${esc(p.option)} ▾</span></div>`;
+      case 'check': return `<span class="muted">&lt;input type="checkbox"&gt; + label</span><span class="ring" style="padding:2px 4px">☑ ${esc(p.target.label)}</span>`;
+      case 'assert-text': return `<span class="muted">Any element with this text</span><span class="toast ring">${esc(p.text)}</span>`;
+      case 'assert-no-text': return `<span class="muted">Must not be on the page</span><span class="fake-input" style="text-decoration:line-through;opacity:.6">${esc(p.text)}</span>`;
+    }
+  }
+
+  function jsonHtml(o, ind = '') {
+    if (typeof o === 'string') return q(o);
+    const keys = Object.keys(o);
+    const inner = keys.map((k) => `${ind}  <span class="k">"${k}"</span>: ${jsonHtml(o[k], ind + '  ')}`).join(',\n');
+    return `{\n${inner}\n${ind}}`;
+  }
+
+  const SAMPLES = [
+    'Open /projects',
+    'Click the New project button',
+    'Enter Alpha in the Name field',
+    'Select Open from the Status dropdown',
+    'Tick the Mine only checkbox',
+    'Verify "Project saved" is displayed',
+    'Go to the Draft projects page',
+    'Click Delete in row PRJ-001 (edited by hand)',
+    'Login as admin',
+  ];
+  const sampleBox = document.getElementById('samples');
+  SAMPLES.forEach((s) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = s;
+    b.onclick = () => { input.value = s; render(); };
+    sampleBox.appendChild(b);
+  });
+
+  const input = document.getElementById('sentence');
+  const out = document.getElementById('labOut');
+  function render() {
+    const line = input.value;
+    let res;
+    if (/^click delete in row prj-001/i.test(line.trim())) {
+      res = { rule: 'not from a pattern: a person added "within" in the step editor', out: { action: 'click', params: { target: { role: 'button', name: 'Delete', within: { role: 'row', text: 'PRJ-001' } } } } };
+    } else res = convert(line);
+    if (!line.trim()) { out.innerHTML = ''; return; }
+    if (!res) {
+      out.innerHTML = `<div class="unmatched"><b>No pattern matched.</b> The rules never guess, so this sentence is listed as "still to convert". A person finishes it in the step editor, or the AI drafting job writes the step from the action catalog.</div>`;
+      return;
+    }
+    if (res.out === 'sign-in') {
+      out.innerHTML = `<div class="note good"><b>Recognised as signing in, so it is left out.</b> The run signs in once by itself, before the steps, using the chosen test account.</div>`;
+      return;
+    }
+    const step = res.out;
+    const pw = playwright(step);
+    out.innerHTML = `<div class="pipeline">
+      <div class="stage"><span class="lbl"><i>1</i>Pattern matched</span><span class="file">convert.ts</span>
+        <pre>${esc(line.trim())}</pre><span class="explain">Rule: <b>${esc(res.rule)}</b></span></div>
+      <div class="stage"><span class="lbl"><i>2</i>Saved step</span><span class="file">SQL Server (approved)</span>
+        <pre>{\n  <span class="k">"action"</span>: ${q(step.action)},\n  <span class="k">"params"</span>: ${jsonHtml(step.params, '  ')}\n}</pre></div>
+      <div class="stage"><span class="lbl"><i>3</i>Playwright runs</span><span class="file">actions.ts → target.ts</span>
+        <pre>${pw.code}</pre><span class="explain">${pw.why}</span></div>
+      <div class="stage"><span class="lbl"><i>4</i>In the browser</span><span class="file">your app</span>
+        <div class="html-demo">${demo(step)}</div></div>
+    </div>`;
+  }
+  input.addEventListener('input', render);
+  render();
+})();
+</script>

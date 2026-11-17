@@ -148,5 +148,6 @@ settings". A "How steps work" guide above the steps explains the idea for beginn
 
 ## Application packs (older)
 
-Code-written actions for one application (`registry.register(defineAction({...}))`), such as the delete-project actions, keep
-running so existing test cases still work. They are no longer offered for new steps; a project defines what it needs as custom steps.
+Code-written actions for one application (`registry.register(defineAction({...}))`) are still supported, but none ship any
+more: the delete-project pack was replaced by CAPEX custom steps. They are not offered for new steps; a project defines what it
+needs as custom steps.

@@ -29,6 +29,7 @@ import { ATTACHMENT_TYPES, LlmError, completeJson } from '@qa-studio/llm';
 import type { ExploredPage } from '@qa-studio/execution-engine';
 import type { Run, TestCase } from '@qa-studio/shared';
 import type { AiService } from './ai-service.js';
+import { nextCaseId } from './case-ids.js';
 import { HttpError } from './errors.js';
 import type { EventBus } from './events.js';
 import type { ScenarioService } from './scenario-service.js';
@@ -180,6 +181,17 @@ const fileNote = (input: { files?: unknown[]; documents?: unknown[] }) => {
 /** The audit trail's note of which skills a generation used. */
 const skillNote = (u: SkillUsage) =>
   u.applied.length > 0 ? ` Skills: ${u.applied.join(', ')}.` : '';
+
+/** IDs AI-written cases were given before they shared the project's numbering (AI-0001, AI-0002, ...). */
+const LEGACY_AI_ID = /^AI-\d+$/;
+
+/**
+ * The next ID for an AI-written case, numbered like cases created by hand (TC_01, TC_02, ...). Legacy AI- IDs are
+ * left out of the choice so a project with many of them still moves to its own format; no collision is possible
+ * because the chosen prefix is never AI-.
+ */
+const nextAiCaseId = (taken: ReadonlySet<string>): string =>
+  nextCaseId([...taken].filter((id) => !LEGACY_AI_ID.test(id)));
 
 function toHttp(e: unknown): HttpError {
   if (e instanceof HttpError) return e;
@@ -728,7 +740,10 @@ export class AiTasks {
         Object.fromEntries(parsed.error.issues.map((i) => [i.path.join('.'), i.message])),
       );
     }
-    const made = toTestCases(parsed.data, { existingIds: new Set(this.d.inventory.keys()) }).map(
+    const made = toTestCases(parsed.data, {
+      existingIds: new Set(this.d.inventory.keys()),
+      nextId: nextAiCaseId,
+    }).map(
       (tc): TestCase => ({
         ...tc,
         ...(hints.projectId && { projectId: hints.projectId }),

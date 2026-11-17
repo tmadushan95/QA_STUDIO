@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Delete-project application steps removed — 2026-11-17
+
+- **The delete-project pack is gone** (`drafts.*`, `project.*`, `projects.open-from-list`, `roles.assert-permission`,
+  `clubbed.*`). CAPEX's delete tests now use CAPEX custom steps built from the standard steps. A saved scenario that still
+  names one of the removed actions is blocked with "unknown action" until its steps are rewritten. Restart the worker.
+
 ### Unsaved AI proposals are no longer lost when you leave the page — 2026-11-16
 
 - **AI Assistant › Generate keeps your prompt and proposed cases** (with their ticks and edits) when you switch tabs or

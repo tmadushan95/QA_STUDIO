@@ -484,23 +484,33 @@ describe('test cases from a prompt', () => {
     expect(r.json().error.code).toBe('invalid-prompt');
   });
 
-  it('adds the chosen proposals as real test cases with AI IDs, an honest source and the ai-generated tag', async () => {
+  it('adds the chosen proposals as real test cases numbered like the rest, an honest source and the ai-generated tag', async () => {
     const { app, inventory, audit } = setup();
     const cases = JSON.parse(proposal).cases;
     const r = await post(app, '/api/ai/cases', { cases });
     expect(r.statusCode).toBe(201);
     const items = r.json().items as TestCase[];
-    expect(items.map((c) => c.id)).toEqual(['AI-0001', 'AI-0002']);
+    // The inventory holds TC_1..TC_3, so AI cases continue that numbering.
+    expect(items.map((c) => c.id)).toEqual(['TC_4', 'TC_5']);
     expect(items[0]).toMatchObject({
       tags: ['ai-generated'],
       source: { workbook: 'AI prompt', rowNumber: 1 },
     });
-    expect(inventory.get('AI-0002')!.steps).toHaveLength(3);
+    expect(inventory.get('TC_5')!.steps).toHaveLength(3);
     expect(audit.some((a) => a.startsWith('ai.cases.add|'))).toBe(true);
     // Adding again continues the numbering instead of overwriting.
     const again = (await post(app, '/api/ai/cases', { cases: [cases[0]] })).json()
       .items as TestCase[];
-    expect(again[0]!.id).toBe('AI-0003');
+    expect(again[0]!.id).toBe('TC_6');
+  });
+
+  it('does not let legacy AI- IDs set the format of new AI cases', async () => {
+    const { app, inventory } = setup();
+    for (const id of ['AI-0001', 'AI-0002', 'AI-0003', 'AI-0004']) inventory.set(id, tc(id));
+    const cases = JSON.parse(proposal).cases;
+    const items = (await post(app, '/api/ai/cases', { cases: [cases[0]] })).json()
+      .items as TestCase[];
+    expect(items[0]!.id).toBe('TC_4');
   });
 
   it('asks for a real description, and reports a model problem in plain words', async () => {
