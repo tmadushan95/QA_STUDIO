@@ -1,0 +1,24 @@
+<section id="faq">
+<div class="head">
+<p class="eyebrow">Be ready for</p>
+<h2 class="title">Questions clients usually ask</h2>
+</div>
+<div class="grid3">
+<div class="card tight"><h3 class="h">Do testers need to code?</h3><p class="t">No. Steps come from a catalog and read as sentences. Leads can package flows as custom steps.</p></div>
+<div class="card tight"><h3 class="h">Will it work with our app?</h3><p class="t">It is built for any web app. Each project sets its address, sign-in method and test accounts.</p></div>
+<div class="card tight"><h3 class="h">Can AI break things?</h3><p class="t">AI is optional and only drafts. A person approves; only known steps; no secrets sent.</p></div>
+<div class="card tight"><h3 class="h">Where is our data?</h3><p class="t">In your SQL Server. Secrets are encrypted; evidence files stay on your server.</p></div>
+<div class="card tight"><h3 class="h">Does it fit our CI?</h3><p class="t">Yes. An Azure Pipelines step runs it, fails the build on failures and publishes results.</p></div>
+<div class="card tight"><h3 class="h">Could it hit production?</h3><p class="t">No. Runs only reach allow-listed environments; data-deleting steps need permission.</p></div>
+</div>
+<aside>Prepare a one-line answer for each; they are on the slide so you can leave it up during Q&amp;A.
+
+Other questions to be ready for:
+• “What about apps we cannot reach from the server?” The machine running the worker must be able to open the app in a browser.
+• “Which browsers?” Runs use Chromium through Playwright today.
+• “Can we add our own step types?” Yes: custom steps in Project settings without code; new built-in steps are a small change in the worker’s registry.
+• “How do we install it?” One script builds and starts the API and the worker; SQL Server and Node.js are prerequisites.
+• “What does it cost to run AI?” Each task has a cap on model calls and answer size, set in settings.
+
+If you do not know an answer, say so and follow up; do not guess.</aside>
+</section>

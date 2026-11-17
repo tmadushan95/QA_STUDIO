@@ -1,0 +1,23 @@
+<section id="security" class="alt">
+<div class="head">
+<p class="eyebrow">Engineering quality · Security and safety</p>
+<h2 class="title">Safe by design</h2>
+</div>
+<div class="grid3">
+<div class="card tight"><x-icon name="Lock" style="width:48px;height:48px;color:#1C7A6C"></x-icon><h3 class="h">Checks at the edge</h3><p class="t">Host and origin checks, then an access token or session, before any endpoint or forward.</p></div>
+<div class="card tight"><x-icon name="Key" style="width:48px;height:48px;color:#1C7A6C"></x-icon><h3 class="h">Secrets stay secret</h3><p class="t">Passwords and keys encrypted at rest, never returned, stripped from AI prompts.</p></div>
+<div class="card tight"><x-icon name="Globe" style="width:48px;height:48px;color:#1C7A6C"></x-icon><h3 class="h">Allowed targets only</h3><p class="t">Runs go only to allow-listed environments; production is refused.</p></div>
+<div class="card tight"><x-icon name="Verified" style="width:48px;height:48px;color:#1C7A6C"></x-icon><h3 class="h">No half-runs</h3><p class="t">All steps validated before any runs; data-deleting steps only where allowed.</p></div>
+<div class="card tight"><x-icon name="Trust" style="width:48px;height:48px;color:#1C7A6C"></x-icon><h3 class="h">No silent overwrites</h3><p class="t">Row versions turn a stale save into a clear conflict.</p></div>
+<div class="card tight"><x-icon name="Users" style="width:48px;height:48px;color:#1C7A6C"></x-icon><h3 class="h">Human in the loop</h3><p class="t">AI only drafts; voice confirms deletes; agents cannot approve.</p></div>
+</div>
+<aside>Security questions usually come up here; this slide answers most of them.
+
+Edge checks: the host check stops DNS-rebinding tricks; the origin check stops another website from driving the API through a user’s browser; an optional access token or session protects everything except health and sign-in.
+
+API and worker trust each other through a shared internal token; the worker is never exposed to the browser.
+
+The encryption key for stored passwords and AI keys is created on first run and must be backed up: without it, stored secrets cannot be decrypted.
+
+The common thread: every new entry point, whether AI, voice or MCP agents, goes through the same rules as a click. There is no side door.</aside>
+</section>

@@ -1,0 +1,29 @@
+<section id="ado">
+<div class="head">
+<p class="eyebrow">Page · Azure DevOps</p>
+<h2 class="title">Azure DevOps, end to end</h2>
+</div>
+<div class="flow">
+<div class="step"><p class="n">1</p><h3 class="h">Import</h3><p class="t">Plan suite to ADO-&lt;id&gt; cases</p></div>
+<p class="arrow">→</p>
+<div class="step"><p class="n">2</p><h3 class="h">Convert</h3><p class="t">Steps from text</p></div>
+<p class="arrow">→</p>
+<div class="step"><p class="n">3</p><h3 class="h">Approve</h3><p class="t">Valid steps only</p></div>
+<p class="arrow">→</p>
+<div class="step"><p class="n">4</p><h3 class="h">Fill values</h3><p class="t">Auto-fill parameters</p></div>
+<p class="arrow">→</p>
+<div class="step"><p class="n">5</p><h3 class="h">Run</h3><p class="t">Chosen users</p></div>
+<p class="arrow">→</p>
+<div class="step hl"><p class="n">6</p><h3 class="h">Publish</h3><p class="t">Results back to the plan</p></div>
+</div>
+<div class="grid3">
+<div class="card tight"><h3 class="h">Connect once</h3><p class="t">A Personal Access Token, stored encrypted and never shown again.</p></div>
+<div class="card tight"><h3 class="h">Re-import safely</h3><p class="t">Importing again updates cases; where people filed them stays.</p></div>
+<div class="card tight"><h3 class="h">From your CI</h3><p class="t">A pipeline step starts QA Studio and fails the build if tests fail.</p></div>
+</div>
+<aside>For clients already on Azure Test Plans, this is the biggest integration story: they keep writing manual test cases in Azure DevOps, and QA Studio automates them.
+
+“Run full pipeline” performs all six stages with one click, each stage shown live.
+
+The Azure Pipelines step means QA Studio becomes a quality gate in their release pipeline: a PowerShell step calls QA Studio with an access token and fails the build if QA Studio’s run fails. Results are published back as an automated test run in the plan, so their existing Azure DevOps reports keep working.</aside>
+</section>

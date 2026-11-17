@@ -1,0 +1,25 @@
+<section id="execution">
+<div class="head">
+<p class="eyebrow">Page · Test Execution</p>
+<h2 class="title">Run what is ready, the way you need</h2>
+</div>
+<table class="tbl">
+<tr class="hd"><th style="width:30%">How to run</th><th style="width:44%">What happens</th><th style="width:26%">Best for</th></tr>
+<tr><td>Fresh window per case (default)</td><td>Each user signs in once; every case opens in a new, clean window.</td><td>Reliable regression</td></tr>
+<tr><td>Same window</td><td>One sign-in, cases run one after another in the same window.</td><td>Fastest runs</td></tr>
+<tr><td>Concurrent users</td><td>Separate browsers at once: different users, or one user in 2 to 8 browsers.</td><td>Roles, double submits</td></tr>
+</table>
+<div class="grid3">
+<div class="card tight"><h3 class="h">Who signs in</h3><p class="t">Tick the test accounts; search and “select all” for large lists.</p></div>
+<div class="card tight"><h3 class="h">Only safe targets</h3><p class="t">Runs go only to allow-listed environments. Production is refused.</p></div>
+<div class="card tight"><h3 class="h">Bulk actions</h3><p class="t">Tick cases, then Run, Concurrent run or Auto-fill parameters.</p></div>
+</div>
+<aside>This is loop step 4. Only cases marked “Ready to run” appear here.
+
+The three run modes answer a real business question: speed versus isolation.
+• Fresh window is the recommended default: fast because each user signs in only once, but clean because nothing carries over between cases.
+• Same window is fastest but one case can affect the next.
+• Concurrent users is for multi-user scenarios: an approver and a requester at the same time, or the same user in two browsers to check a double submit.
+
+Safety: runs are only allowed against environments on an allow-list, so nobody can point QA Studio at production by mistake. Outside concurrent mode one account never runs in two browsers at once.</aside>
+</section>

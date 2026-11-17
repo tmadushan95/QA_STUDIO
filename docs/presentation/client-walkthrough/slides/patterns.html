@@ -1,0 +1,22 @@
+<section id="patterns" class="alt">
+<div class="head">
+<p class="eyebrow">Engineering quality</p>
+<h2 class="title">Design patterns, and why we use them</h2>
+</div>
+<table class="tbl sm">
+<tr class="hd"><th style="width:18%">Area</th><th style="width:44%">Patterns</th><th style="width:38%">Why it matters</th></tr>
+<tr><td>Structure</td><td>Clean Architecture, DDD, CQRS, vertical slices</td><td>Rules stay independent of technology</td></tr>
+<tr><td>Requests</td><td>Mediator, pipeline (chain of responsibility), REPR endpoints, middleware</td><td>Thin HTTP layer; logging and validation in one place</td></tr>
+<tr><td>Data</td><td>Repository, Unit of Work, Decorator cache, optimistic concurrency, write-behind</td><td>Atomic saves, fast reads, no silent overwrites</td></tr>
+<tr><td>Extensibility</td><td>Registry (plugin), Interpreter, Composite, Strategy, Adapter</td><td>New steps and AI providers without touching the core</td></tr>
+<tr><td>Integration</td><td>Reverse proxy gateway, Strangler fig, publish/subscribe with SSE</td><td>Migrate safely; pages update live</td></tr>
+<tr><td>UI</td><td>Atomic design, feature folders, context provider, custom hooks, lazy loading</td><td>Consistent screens and a fast first load</td></tr>
+</table>
+<aside>Do not read the table out. Pick two or three patterns that matter to this audience and tell the story:
+
+• Strangler fig with a gateway: we are moving features from the Node worker into .NET in stages. Because the API’s reverse proxy forwards anything it does not handle, each feature moves without the web app noticing. No big-bang rewrite, no risky cut-over.
+• Registry plus Interpreter: test steps are data, the registry knows each step type, and the interpreter runs them after validating all of them. That is what makes the tool code-free and safe.
+• Optimistic concurrency: two people editing the same case never silently overwrite each other.
+
+Strategy and Adapter appear in AI: Anthropic, Gemini and a fake provider for tests sit behind one interface, so the provider can be swapped.</aside>
+</section>

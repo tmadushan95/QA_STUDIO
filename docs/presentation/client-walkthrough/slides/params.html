@@ -1,0 +1,26 @@
+<section id="params">
+<div class="head">
+<p class="eyebrow">Inside a test case · Parameters</p>
+<h2 class="title">Test data without hard-coding it</h2>
+</div>
+<table class="tbl">
+<tr class="hd"><th style="width:22%">Source</th><th style="width:36%">Where it is set</th><th style="width:42%">Use it for</th></tr>
+<tr><td>This case</td><td>The case’s Parameters tab</td><td>A value only this test case uses</td></tr>
+<tr><td>Project common</td><td>Project settings › Parameters</td><td>A value every case shares, such as a project code</td></tr>
+</table>
+<div class="flow">
+<div class="step"><p class="n">Rule 1</p><h3 class="h">Case value wins</h3><p class="t">A case’s own value overrides the common one.</p></div>
+<p class="arrow">→</p>
+<div class="step"><p class="n">Rule 2</p><h3 class="h">Else project common</h3><p class="t">Shared values fill the gaps.</p></div>
+<p class="arrow">→</p>
+<div class="step hl"><p class="n">Rule 3</p><h3 class="h">Else the case is blocked</h3><p class="t">Named clearly at run time; it never half-runs.</p></div>
+</div>
+<p class="note"><b>Auto-fill</b> fills empty values for review: earlier test data, then AI, then a guess from the name. Names that look like passwords, tokens or keys are never filled.</p>
+<aside>Steps refer to values by name, written {{data.name}}, so the same case can run with different data and nothing sensitive is typed into the steps themselves.
+
+Explain the three rules simply: the case’s own value, else the project’s shared value, else the case is blocked before it starts, with the missing name shown. Blocked is different from failed: it means “not runnable yet”, not “the app is broken”.
+
+Auto-fill saves a lot of typing when many cases are imported at once. It only fills empty values and never overwrites what a person set.
+
+Credentials never go here; they belong to Sign-in users, where they are encrypted.</aside>
+</section>

@@ -1,0 +1,25 @@
+<section id="run-flow" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture · A run, end to end</p>
+<h2 class="title">One run, followed end to end</h2>
+</div>
+<div class="grid4">
+<div class="step"><p class="n">1</p><h3 class="h">Press Run</h3><p class="t">POST /api/runs with cases, users and mode.</p></div>
+<div class="step"><p class="n">2</p><h3 class="h">Gateway</h3><p class="t">The API forwards it to the worker.</p></div>
+<div class="step"><p class="n">3</p><h3 class="h">Run manager</h3><p class="t">Reloads cases, queues one job per case and user.</p></div>
+<div class="step"><p class="n">4</p><h3 class="h">Browser</h3><p class="t">Playwright opens Chromium and signs in.</p></div>
+<div class="step hl"><p class="n">5</p><h3 class="h">Validate first</h3><p class="t">Every step is checked; any problem blocks the case.</p></div>
+<div class="step"><p class="n">6</p><h3 class="h">Run steps</h3><p class="t">In order, with screenshots and a trace.</p></div>
+<div class="step"><p class="n">7</p><h3 class="h">Save</h3><p class="t">Results batched to the API and SQL Server.</p></div>
+<div class="step"><p class="n">8</p><h3 class="h">Live update</h3><p class="t">Run History redraws as each case ends.</p></div>
+</div>
+<aside>Now the second shape of request: running tests.
+
+The API does not implement runs itself, so the gateway forwards the request to the worker, transparently.
+
+The run manager keeps a queue, limits how many browsers run at once, supports cancel, and reloads the cases from the database before the run, so it never uses stale data.
+
+Step 5 is a key safety property: the step interpreter validates every step of a case before running any of them. An unknown action, a bad parameter or a missing value means the case is “blocked” and nothing runs. You never get a half-executed test that left data in a strange state because of a typo.
+
+Results are written behind in batches (fast) but a save is only confirmed once committed. If the worker restarts, runs that were in progress are closed as cancelled, so history never lies.</aside>
+</section>

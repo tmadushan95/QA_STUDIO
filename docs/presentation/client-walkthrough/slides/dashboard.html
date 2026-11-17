@@ -1,0 +1,22 @@
+<section id="dashboard">
+<div class="head">
+<p class="eyebrow">Page · Dashboard</p>
+<h2 class="title">Are we ready to release?</h2>
+</div>
+<div class="grid3">
+<div class="card tight"><h3 class="h">Test cases</h3><p class="t">Size of the library in this project and version.</p></div>
+<div class="card tight"><h3 class="h">Automated</h3><p class="t">How many cases can run without a person.</p></div>
+<div class="card tight"><h3 class="h">Pass rate</h3><p class="t">Share of latest results that passed, with its trend.</p></div>
+<div class="card tight"><h3 class="h">Failed</h3><p class="t">Cases where the app did not behave as expected.</p></div>
+<div class="card tight"><h3 class="h">Blocked</h3><p class="t">Cases that could not start: a step or value is missing.</p></div>
+<div class="card tight"><h3 class="h">Runs this week</h3><p class="t">How actively the suite is being used.</p></div>
+</div>
+<div class="pills"><p class="pill navy">Pass-rate trend</p><p class="pill navy">Latest results</p><p class="pill navy">Automation readiness</p><p class="pill navy">Coverage by module</p><p class="pill navy">By project · version · priority</p><p class="pill navy">Recent runs</p><p class="pill warn">High-priority failures: fix these first</p></div>
+<aside>The dashboard is the manager’s page. It answers one question: are we ready to release this version?
+
+Six key numbers on top, then panels. Point out “High-priority failures” in particular: it is a ready-made to-do list for the team.
+
+Everything respects the header scope, so switching the version from 2.4 to 2.5 instantly shows that release’s picture.
+
+Engineering note if asked: the dashboard is a read-only query served by the .NET API with hand-written SQL (Dapper), so it stays fast as the library grows. The numbers are calculated in a pure function that is unit tested.</aside>
+</section>

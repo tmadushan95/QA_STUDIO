@@ -1,0 +1,23 @@
+<section id="req-flow" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture · A save, end to end</p>
+<h2 class="title">One save, followed end to end</h2>
+</div>
+<div class="grid4">
+<div class="step"><p class="n">1</p><h3 class="h">React dialog</h3><p class="t">The feature’s api.ts sends POST /api/test-cases.</p></div>
+<div class="step"><p class="n">2</p><h3 class="h">Security</h3><p class="t">Host, origin and token checks run first.</p></div>
+<div class="step"><p class="n">3</p><h3 class="h">Endpoint</h3><p class="t">Turns HTTP into a command. No business logic.</p></div>
+<div class="step"><p class="n">4</p><h3 class="h">Pipeline</h3><p class="t">Logging, then validation, then the handler.</p></div>
+<div class="step"><p class="n">5</p><h3 class="h">Handler + domain</h3><p class="t">The entity checks its own rules.</p></div>
+<div class="step"><p class="n">6</p><h3 class="h">Unit of work</h3><p class="t">Case and steps saved in one transaction.</p></div>
+<div class="step"><p class="n">7</p><h3 class="h">Notify</h3><p class="t">The worker is told; the API returns 201.</p></div>
+<div class="step hl"><p class="n">8</p><h3 class="h">Live update</h3><p class="t">An event reaches every open page, which refetches.</p></div>
+</div>
+<aside>Follow one real request: a tester creates a test case by hand.
+
+The point to land: each layer does exactly one job. The endpoint knows HTTP, the handler knows the use case, the domain knows the rules, the repository knows SQL. That is what makes the system easy to change and to test.
+
+Errors are caught at the earliest layer: a bad shape at the validator, a broken rule such as “title is required” in the domain, a duplicate in the database. Every layer returns the same JSON error shape, so the web app can show the message and highlight the exact field.
+
+Step 8 is why pages update by themselves: the server only says “test cases changed”, and each open page fetches fresh data.</aside>
+</section>

@@ -1,0 +1,26 @@
+<section id="data" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture · Data</p>
+<h2 class="title">One source of truth: SQL Server</h2>
+</div>
+<div class="flow">
+<div class="step"><p class="n">Master</p><h3 class="h">Project</h3><p class="t">Address, sign-in, accounts</p></div>
+<p class="arrow">→</p>
+<div class="step"><p class="n">Master</p><h3 class="h">Version and suite</h3><p class="t">Release and folder</p></div>
+<p class="arrow">→</p>
+<div class="step hl"><p class="n">Library</p><h3 class="h">Test case</h3><p class="t">Unique case code</p></div>
+<p class="arrow">→</p>
+<div class="step"><p class="n">Library</p><h3 class="h">Steps and runs</h3><p class="t">Scenario, results</p></div>
+</div>
+<div class="grid2">
+<div class="card tight"><h3 class="h">Relational tables</h3><p class="t">Projects, versions, suites, test cases, accounts, audit. Deletes are restricted down the tree; every editable row has a row version, so a stale save gets a clear conflict.</p></div>
+<div class="card tight"><h3 class="h">JSON documents</h3><p class="t">Runnable scenarios, runs and settings, whose shape belongs to the step engine. Status and version are columns for fast filtering. Evidence files stay on disk.</p></div>
+</div>
+<aside>The hierarchy from the business brief is Project, then Test suite, then Test case. Versions sit beside suites.
+
+A pragmatic choice worth explaining: test cases are proper relational tables, but scenarios and runs are stored as JSON documents in SQL Server, with a JSON validity check. Their shape belongs to the step engine and changes with it, and nobody needs to query inside them with SQL. Normalising them would mean keeping two schemas in step for no benefit.
+
+Safety in the schema: deletes are restricted, so one click cannot remove a whole project’s library; row versions give optimistic concurrency; passwords and AI keys are stored encrypted. Screenshots and traces are files on disk, listed in the run.
+
+Measured performance from our database notes: fetching one case takes about 7 to 30 ms, and a page of cases by suite about 6 to 14 ms. Free-text search is the slowest operation today, at a few seconds; mention this only if asked.</aside>
+</section>

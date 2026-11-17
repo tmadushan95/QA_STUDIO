@@ -1,0 +1,29 @@
+<section id="quality" class="alt">
+<div class="head">
+<p class="eyebrow">Engineering quality · Testing</p>
+<h2 class="title">Quality is built in, not added</h2>
+</div>
+<div class="grid2" style="gap:64px">
+<div class="pyr">
+<div class="lvl" style="width:360px"><p class="h">UI</p><p class="t">Whole app + axe</p></div>
+<div class="lvl" style="width:520px"><p class="h">Worker app</p><p class="t">Routes with fakes, Playwright on a stub</p></div>
+<div class="lvl" style="width:680px"><p class="h">Integration</p><p class="t">Real API, throw-away SQL Server database</p></div>
+<div class="lvl" style="width:800px"><p class="h">Unit</p><p class="t">Pure rules, no I/O, many and fast</p></div>
+</div>
+<div class="feats">
+<div class="feat"><h3 class="h">Warnings fail the build</h3><p class="t">C# with SonarAnalyzer and nullable on; TypeScript strict with ESLint and Prettier.</p></div>
+<div class="feat"><h3 class="h">Same checks in CI</h3><p class="t">Azure Pipelines runs every test and lint before a merge.</p></div>
+<div class="feat"><h3 class="h">One trace across programs</h3><p class="t">Aspire and OpenTelemetry follow a click through API, gateway and worker.</p></div>
+<div class="feat"><h3 class="h">Decisions written down</h3><p class="t">Docs, changelog and architecture decision records change with the code.</p></div>
+</div>
+</div>
+<aside>A test pyramid: many fast unit tests on pure rules, fewer integration tests, and a smaller number of whole-app UI tests.
+
+Integration tests create a temporary database with a unique name and drop it afterwards, so they never touch real data.
+
+The UI tests render the whole app against a fake server and run automated accessibility checks (axe) on every page.
+
+For developers, the Aspire dashboard shows one click followed through the API, the gateway and the worker as a single timeline, which makes problems much faster to diagnose. It is a development tool only; installs stay simple.
+
+Rule of thumb we follow: put a rule in a pure function, test it with plain inputs, and test the wiring only once.</aside>
+</section>

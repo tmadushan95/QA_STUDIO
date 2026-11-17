@@ -1,0 +1,26 @@
+<section id="arch-big" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture</p>
+<h2 class="title">Three programs, one front door</h2>
+</div>
+<div class="node" style="left:128px;top:320px;width:300px;height:290px"><h3 class="h">Web app</h3><p class="t">React + TypeScript. What people see and click.</p></div>
+<div class="node key" style="left:508px;top:320px;width:420px;height:290px"><h3 class="h">.NET 10 API</h3><p class="t">The front door: security, projects, suites, versions, test cases, dashboard. Forwards the rest to the worker.</p></div>
+<div class="node" style="left:1008px;top:320px;width:440px;height:290px"><h3 class="h">Node.js worker</h3><p class="t">Playwright runs, step engine, Excel import, reports, AI, live events.</p></div>
+<div class="node" style="left:1528px;top:320px;width:264px;height:290px"><h3 class="h">Your app</h3><p class="t">The app under test, in a real browser.</p></div>
+<div class="node db" style="left:508px;top:700px;width:420px;height:180px"><h3 class="h">SQL Server</h3><p class="t">The single source of truth.</p></div>
+<p class="pinnote" style="left:1008px;top:700px;width:784px">The browser only ever talks to the API. The worker keeps a fast in-memory copy and writes back through the API in ordered batches (dashed line).</p>
+<x-connector class="wire" x1="428" y1="465" x2="508" y2="465" head="both"></x-connector>
+<x-connector class="wire" x1="928" y1="465" x2="1008" y2="465" head="end"></x-connector>
+<x-connector class="wire" x1="1448" y1="465" x2="1528" y2="465" head="end"></x-connector>
+<x-connector class="wire" x1="718" y1="610" x2="718" y2="700" head="both"></x-connector>
+<x-connector class="wire dash" x1="1228" y1="610" x2="928" y2="790" route="vh" head="end"></x-connector>
+<aside>This is the slide for the technical people. QA Studio is three programs.
+
+1 The web app (React, TypeScript): only the user interface. It talks to one address only.
+2 The .NET 10 API: the front door. It owns security and the database, and implements the core business data: projects, suites, versions, test cases and the dashboard. Anything it does not implement itself it forwards to the worker, through a built-in reverse proxy (YARP).
+3 The Node.js worker: everything that is best done in Node: driving the browser with Playwright, the step engine, Excel import, reports and AI.
+
+SQL Server holds all data. The worker has no database of its own: it loads a snapshot at start-up and writes changes back through the API’s internal routes in ordered batches. A save is only confirmed to the user once it is in the database.
+
+Why two backends? Playwright and the step engine are strongest in Node; storage, security and business rules are strongest in .NET. Because of the gateway, features can move from the worker to .NET one by one with no change to the web app.</aside>
+</section>

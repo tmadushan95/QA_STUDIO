@@ -1,0 +1,23 @@
+<section id="ai">
+<div class="head">
+<p class="eyebrow">Page · AI Assistant</p>
+<h2 class="title">AI that drafts, people approve</h2>
+</div>
+<div class="grid3">
+<div class="card tight"><p class="num">1</p><h3 class="h">Generate test cases</h3><p class="t">Describe a feature, attach files, pick coverage: Smoke, Standard or Thorough. A checklist covers functional, negative, permission, validation, boundary, UI and accessibility.</p></div>
+<div class="card tight"><p class="num">2</p><h3 class="h">Write steps</h3><p class="t">Drafts runnable steps for cases that have none. Anything it cannot automate is listed as “Check by hand”.</p></div>
+<div class="card tight"><p class="num">3</p><h3 class="h">Teach it your app</h3><p class="t">Reads pages of the app, read-only, so its steps use the app’s real labels.</p></div>
+</div>
+<div class="box navy"><p class="k">Guardrails, always on</p><p class="v">AI never changes a test case · drafts need a person’s approval · only known step types · passwords and keys never leave the machine · spending limits per task.</p></div>
+<aside>AI is optional and the product works fully without it. Providers: Anthropic and Google Gemini, chosen in settings.
+
+Generate: the coverage bar shows what is covered and what is not (for example “Permission 1 · Not covered: Boundary”), so gaps are visible before saving. Saved Skills (reusable instructions, used as /skill-name) shape wording and scope, never the safety rules. Proposals are kept until saved or discarded, even if you switch pages.
+
+The guardrails are the most important part for a client:
+• AI only produces drafts; a person approves before anything runs.
+• Every AI step is checked against the same list of known actions as a hand-written step.
+• Secrets are removed from everything sent to a model.
+• There are spending limits on model calls.
+
+“Teach the assistant your app” blocks every write request in the browser, so reading a page can never change data.</aside>
+</section>

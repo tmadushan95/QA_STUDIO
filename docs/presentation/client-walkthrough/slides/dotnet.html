@@ -1,0 +1,28 @@
+<section id="dotnet" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture · .NET API</p>
+<h2 class="title">Clean Architecture with CQRS</h2>
+</div>
+<div class="grid2" style="gap:64px">
+<div class="layers">
+<div class="layer"><h3 class="h">API</h3><p class="t">Endpoints, security, gateway, error shape. Knows HTTP.</p></div>
+<div class="layer"><h3 class="h">Infrastructure</h3><p class="t">EF Core, Dapper SQL, repositories, cache. Knows technology.</p></div>
+<div class="layer"><h3 class="h">Application</h3><p class="t">One folder per use case: command or query, validator, handler.</p></div>
+<div class="layer core"><h3 class="h">Core (domain)</h3><p class="t">Entities and rules. Depends on nothing.</p></div>
+</div>
+<div class="feats">
+<div class="feat"><h3 class="h">Dependencies point inward</h3><p class="t">Core never mentions EF Core, HTTP or JSON, so rules are tested without a database.</p></div>
+<div class="feat"><h3 class="h">Commands and queries</h3><p class="t">Writes use a rich model and one transaction (EF Core); reads use fast hand-written SQL (Dapper).</p></div>
+<div class="feat"><h3 class="h">One pipeline for every request</h3><p class="t">Dispatcher: Logging, then Validation, then Handler. Nothing to register by hand.</p></div>
+</div>
+</div>
+<aside>For architects in the room.
+
+Clean (Onion) Architecture: four projects, and the dependency rule says arrows only point inward. The domain in the middle knows nothing about databases or the web. Application declares interfaces such as IDashboardReader; Infrastructure implements them; dependency injection connects them at start-up.
+
+CQRS: every use case is either a command (changes state) or a query (only reads), each with exactly one handler, in its own folder: Application/Features/TestCases/CreateTestCase. A feature is easy to find, change or delete. This is the vertical-slice layout.
+
+We wrote a small mediator (the Dispatcher) with pipeline behaviours, so logging and validation are applied in one place for every request.
+
+Writes go through EF Core repositories and a unit of work; reads for lists and dashboards use Dapper with hand-written SQL, which is faster and clearer for aggregates.</aside>
+</section>

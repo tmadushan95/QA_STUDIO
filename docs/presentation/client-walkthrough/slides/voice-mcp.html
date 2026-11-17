@@ -1,0 +1,16 @@
+<section id="voice-mcp">
+<div class="head">
+<p class="eyebrow">Extras</p>
+<h2 class="title">Hands-free and agent-ready</h2>
+</div>
+<div class="grid2">
+<div class="card"><x-icon name="Chat" style="width:56px;height:56px;color:#1C7A6C"></x-icon><h3 class="h">Voice control</h3><p class="t">Say “Hey QA Studio” or press Ctrl+Space, then open pages, fill forms, run cases or generate cases by voice.</p><p class="t">Each command runs the same code as a click, so the same checks apply. Deletes need a spoken “yes”, and voice never types passwords.</p></div>
+<div class="card"><x-icon name="Link" style="width:56px;height:56px;color:#1C7A6C"></x-icon><h3 class="h">MCP server for AI agents</h3><p class="t">AI assistants such as Claude can search cases, read runs, save step drafts and start runs.</p><p class="t">There is deliberately no tool to approve, delete, change settings or read a key.</p></div>
+</div>
+<p class="note">Same principle as the AI Assistant: new ways in, but no new way around the rules.</p>
+<aside>These are differentiators; mention them briefly unless the client is interested.
+
+Voice: the wake phrase is detected on the device, so audio leaves the browser only after the phrase is heard. Built on LiveKit. It is off by default.
+
+MCP (Model Context Protocol) is the standard way AI assistants use tools. QA Studio exposes itself as tools, but every call goes through the normal API, with the same validation and audit trail. An agent can propose a draft and start runs of approved scenarios; it can never approve its own work.</aside>
+</section>

@@ -1,0 +1,22 @@
+<section id="projects">
+<div class="head">
+<p class="eyebrow">Page · Projects and Project settings</p>
+<h2 class="title">Project settings: set up once</h2>
+</div>
+<div class="grid3">
+<div class="card tight"><h3 class="h">Application and sign-in</h3><p class="t">The app’s address and how a run signs in: a login form, a saved session, or none.</p></div>
+<div class="card tight"><h3 class="h">Versions</h3><p class="t">Releases such as 2.4 or Sprint 18. One can be current. Deleting one keeps its cases.</p></div>
+<div class="card tight"><h3 class="h">Test suites</h3><p class="t">Folders for cases. A suite that still holds cases cannot be deleted by accident.</p></div>
+<div class="card tight"><h3 class="h">Parameters</h3><p class="t">Values every case of the project shares, such as a project code.</p></div>
+<div class="card tight"><h3 class="h">Custom steps</h3><p class="t">The project’s own reusable steps, built from standard ones, for example “Create a draft project”.</p></div>
+<div class="card tight"><h3 class="h">Sign-in users</h3><p class="t">Test accounts such as “Approver”. Passwords are encrypted and never shown again.</p></div>
+</div>
+<p class="note">Business value: each client application is configured once by a lead; testers then just pick the project and work.</p>
+<aside>This is the master data: Project, then Version, then Test suite, then Test case.
+
+Stress the safety rules, they reassure clients:
+• A project that still has suites or accounts, or a suite that still has cases, cannot be deleted. One click can never wipe a test library.
+• Passwords for test accounts are encrypted at rest and never sent back to the browser.
+
+Custom steps are a strong selling point for leads: they package a common flow (for example “log in and open the reports page”) into one named step with inputs. Testers then use it like any built-in step, and if the flow changes it is fixed in one place.</aside>
+</section>

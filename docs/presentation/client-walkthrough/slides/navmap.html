@@ -1,0 +1,20 @@
+<section id="navmap">
+<div class="head">
+<p class="eyebrow">The product tour</p>
+<h2 class="title">Organised like Azure DevOps</h2>
+</div>
+<div class="box navy" style="flex-direction:row;align-items:center;gap:24px"><p class="k">Header</p><p class="route">Projects / [SHOP ▾] / [2.4 ▾]</p><p class="v">Pick a project, then a version. Every page works inside that choice.</p></div>
+<div class="grid2">
+<div class="card"><h3 class="h">Organization level</h3><p class="t">Projects: the start page, choose or create a project.</p><p class="t">Organization settings: Execution, Pages, AI, Voice, Data and storage, Audit log.</p><p class="route">/  ·  /settings/…</p></div>
+<div class="card"><h3 class="h">Project level</h3><p class="t">Dashboard · Test Case Studio · AI Assistant · Test Execution · Run History · Azure DevOps · Project settings.</p><p class="route">/project/&lt;CODE&gt;/…</p></div>
+</div>
+<p class="note">One project and version picker for the whole app, so two pages can never disagree about scope. Deep links work: any address can be bookmarked or shared.</p>
+<aside>Explain the mental model before showing pages. If the client uses Azure DevOps, this is instantly familiar: organisation, then project, then a branch-like version.
+
+Points to make:
+• The header is the only place you choose project and version, so every list, run and chart agrees.
+• Versions are releases such as “2.4” or “Sprint 18”; one can be marked current.
+• Clean web addresses mean a tester can send a colleague a link straight to a page.
+
+Engineering note if asked: a React context provider (ProjectScope) holds the scope; pages are lazy-loaded so the first load stays fast.</aside>
+</section>

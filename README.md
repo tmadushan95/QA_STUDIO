@@ -32,6 +32,29 @@
 
 ## 1. What QA Studio does
 
+### The idea: tests are data, not code
+
+A test step is stored as a small piece of **data**, not as a line of code. For example, _click the button named Delete_ is:
+
+```json
+{ "action": "click", "params": { "target": { "role": "button", "name": "Delete" } } }
+```
+
+- **Describe:** testers build steps from a catalog, in plain words.
+- **Run:** a real browser (Playwright) performs them.
+- **See:** everyone sees the same live results and evidence.
+
+Why this matters:
+
+- A tester can create and fix tests **without a developer**.
+- The same steps work on **any web application**. Nothing is written for a specific app.
+- Because steps are data, QA Studio **checks them before running**. AI-written steps go through the same checks before
+  anyone relies on them.
+
+Most of what follows comes from this idea.
+
+### What it does
+
 QA Studio manages **test cases** for web applications and **runs them automatically** in a real browser.
 
 1. A tester creates test cases: by hand, from **Excel**, from **Azure DevOps**, or with **AI**.
@@ -44,6 +67,40 @@ that project and version.
 
 **Main screens:** Projects · Dashboard · Test Case Studio · AI Assistant · Test Execution · Run History · Azure DevOps ·
 Project settings · Organization settings.
+
+### Key features
+
+**Writing test cases**
+
+- **Readable step editor.** Each step reads as a sentence with its values highlighted. Missing required values are named
+  in plain words. The step editor and custom step dialogs open full screen and show a checklist of what is needed to save.
+- **Parameter picker.** Search, pick or create parameters with the keyboard. Parameters appear as chips showing their value.
+- **Edit details and steps** of a written case in one form. If someone else saved first, you are told about the conflict.
+- **Reorder test cases** by drag-and-drop or from the row menu. The order is saved.
+- **"Improve with AI"** on a step shows the old and new versions side by side with the changes highlighted, so you can
+  choose whether to accept.
+
+**AI Assistant (test case generation)**
+
+- **Chat sessions.** Generation is a conversation that keeps its history. You can start, reopen and manage sessions.
+- **Attachments.** Add images, PDFs or text files (such as screenshots or specs) to a request. They are checked, previewed,
+  and sent to the AI provider.
+- **Coverage levels:** _Smoke_, _Standard_ or _Thorough_. Each checklist item gets one case, up to 20 cases on Thorough.
+  The UI shows each case's category, whether it needs a manual check, and a coverage summary.
+- **Unsaved proposals survive a reload.** They are kept per project and tab, and you are warned before closing a tab with
+  unsaved work.
+- AI-generated cases use the same `TC_xx` IDs as every other case.
+
+**Running tests**
+
+- **Three run modes:** a fresh browser window per case, one shared window, or **concurrent users**. Advanced options cover
+  choosing accounts and browser/session settings. Browsers open maximized and can reuse an existing sign-in.
+- **Live run view.** A progress ring, an animated result bar and a filterable case list update as the run goes.
+- **Focused Test Execution page.** Compact case rows and simpler filters. A selection bar replaces the old bulk-run buttons.
+- **Readable results.** Step results appear as plain sentences in the UI and in reports.
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full history, and [docs/qa-studio-run-flow.html](docs/qa-studio-run-flow.html)
+for a visual walk-through of a run.
 
 ---
 
@@ -422,6 +479,8 @@ Every decision and its trade-offs are recorded in [`docs/adr/`](docs/adr/).
 | [docs/STEP-FORMAT.md](docs/STEP-FORMAT.md)                       | Every generic step action and how elements are found             |
 | [docs/TEST-CASES-AND-IMPORTS.md](docs/TEST-CASES-AND-IMPORTS.md) | Test Case Studio, versions, Excel/AI/Azure DevOps import         |
 | [docs/AI-AND-MCP.md](docs/AI-AND-MCP.md)                         | AI features and connecting an assistant through MCP              |
+| [docs/qa-studio-run-flow.html](docs/qa-studio-run-flow.html)     | Visual walk-through of what happens during a run                 |
+| [docs/presentation/client-walkthrough/](docs/presentation/client-walkthrough/) | Client presentation deck (source and link to the live deck) |
 | [docs/adr/](docs/adr/)                                           | Architecture decision records                                    |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md)                           | Release history                                                  |
 | [Backend/README.md](Backend/README.md)                           | Every API setting and backend command                            |

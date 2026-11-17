@@ -1,0 +1,25 @@
+<section id="frontend" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture · Web app</p>
+<h2 class="title">The web app: small, focused pieces</h2>
+</div>
+<div class="grid2" style="gap:64px">
+<div class="layers">
+<div class="layer"><h3 class="h">Features</h3><p class="t">One folder per page, each with its own api.ts.</p></div>
+<div class="layer"><h3 class="h">Templates and organisms</h3><p class="t">App layout, dialogs, data tables, panels.</p></div>
+<div class="layer"><h3 class="h">Molecules</h3><p class="t">Field, menu, tabs, alert, status badge.</p></div>
+<div class="layer core"><h3 class="h">Atoms and tokens</h3><p class="t">Button, icon, inputs; colours and spacing set once.</p></div>
+</div>
+<div class="feats">
+<div class="feat"><h3 class="h">No global store</h3><p class="t">Each screen loads what it needs; a live event says “changed” and the screen refetches.</p></div>
+<div class="feat"><h3 class="h">One shared scope</h3><p class="t">A context provider holds project and version for every page.</p></div>
+<div class="feat"><h3 class="h">Works on any screen</h3><p class="t">Sidebar on desktop, icon rail on tablet, drawer and bottom bar on phones.</p></div>
+<div class="feat"><h3 class="h">Accessible by default</h3><p class="t">Keyboard support, labelled inputs, automated axe checks on every page.</p></div>
+</div>
+</div>
+<aside>Atomic Design: the design system is built from atoms (buttons, inputs) up to molecules, organisms and page templates. It knows nothing about the business and never calls the API. Features own their screens and their own api.ts, the only place that builds that feature’s requests.
+
+No Redux: server data stays on the server. Two custom hooks do the work: useResource loads data and ignores stale answers, useLive subscribes to the one shared live-event connection. This is why live updates are simple and never get out of sync.
+
+Pages are lazy-loaded so the first load is fast. Colour is never the only signal; every status also has a word or an icon.</aside>
+</section>

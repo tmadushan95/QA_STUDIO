@@ -1,0 +1,31 @@
+<section id="worker" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture · Node worker</p>
+<h2 class="title">The worker: steps are data</h2>
+</div>
+<div class="split">
+<div class="side">
+<div class="code">
+<p class="c">// one stored step</p>
+<p class="ln">{ "action": "click",</p>
+<p class="ln">&#160;&#160;"params": { "target": {</p>
+<p class="ln">&#160;&#160;&#160;&#160;"role": "button",</p>
+<p class="ln">&#160;&#160;&#160;&#160;"name": "Delete" } } }</p>
+</div>
+<p class="note">Values come in as {{data.name}} from parameters, or {{var.name}} remembered by an earlier step.</p>
+</div>
+<div class="feats">
+<div class="feat"><h3 class="h">Action registry</h3><p class="t">Each step type registers a schema, a run function and form hints. New steps plug in; the runner never changes.</p></div>
+<div class="feat"><h3 class="h">One schema, three uses</h3><p class="t">The same Zod schema validates a step, documents it and draws its form in the editor. No drift.</p></div>
+<div class="feat"><h3 class="h">An interpreter</h3><p class="t">Checks every step first, then runs them in order and records each result.</p></div>
+<div class="feat"><h3 class="h">Custom steps</h3><p class="t">A project’s own step made from standard steps, treated like any built-in one.</p></div>
+</div>
+</div>
+<aside>This is the heart of the product and the reason the worker is in Node.
+
+A test step is a small JSON document: an action name and its parameters. The registry maps each action name to its definition: a Zod schema saying which parameters are valid, a function that performs it with Playwright, and UI metadata (label, group, fields).
+
+Because one schema drives validation, documentation and the editor form, they can never disagree. Adding a new standard step, for example “double-click”, makes it appear in the editor with no frontend change.
+
+Custom steps use the Composite pattern: one step made of other steps, with inputs. The worker is split into packages, each with one job: shared schemas, automation-core (the step engine), execution-engine (run manager and Playwright), test-case-import (Excel), agents and llm (AI), knowledge (search index) and reporting.</aside>
+</section>

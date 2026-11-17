@@ -1,0 +1,28 @@
+<section id="editor">
+<div class="head">
+<p class="eyebrow">Inside a test case · Step editor</p>
+<h2 class="title">Build steps without writing code</h2>
+</div>
+<div class="split">
+<div class="side">
+<div class="card tight"><p class="pill navy">Step 3 · Click</p><p class="t">Target: Button named <b>Delete</b>, inside the dialog</p><p class="t"><b>What this step does:</b> clicks the “Delete” button in the dialog.</p></div>
+<div class="card tight"><p class="pill navy">Step 4 · Type</p><p class="t">Field: Search · Value: <span class="accent"><b>projectCode</b></span> = QA-1117</p></div>
+<p class="note">Nobody writes CSS selectors: an element is described the way a person sees it.</p>
+</div>
+<div class="feats">
+<div class="feat"><h3 class="h">Steps read like sentences</h3><p class="t">Each card shows its step in plain words; hide details and the list reads like the whole test.</p></div>
+<div class="feat"><h3 class="h">Checked as you type</h3><p class="t">Unknown actions, missing values and bad parameters are flagged before saving.</p></div>
+<div class="feat"><h3 class="h">Parameters as chips</h3><p class="t">“Use parameter” inserts a value by name and shows its current value.</p></div>
+<div class="feat"><h3 class="h">Drafts never break runs</h3><p class="t">A save with problems stays a draft; the last valid version keeps running. A stale save is refused, not overwritten.</p></div>
+</div>
+</div>
+<aside>The popup for a case has five tabs: Steps, Details, Parameters, Runs and History. This slide is the Steps tab.
+
+Key points:
+• Each step card is drawn from a catalog the server sends. When we add a new kind of step, it appears in the editor with no change to the web app.
+• Elements are described by role and name (“the button named Delete, inside the dialog”), which is how Playwright finds them. This is far more robust than CSS selectors when the page layout changes.
+• Validation runs as you type, so a broken step is visible immediately.
+• If two people edit the same case, the second save is refused with a clear message and an offer to reload, instead of silently losing the first person’s work.
+
+Example values on the slide are illustrative.</aside>
+</section>

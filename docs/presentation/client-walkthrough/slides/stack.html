@@ -1,0 +1,21 @@
+<section id="stack" class="alt">
+<div class="head">
+<p class="eyebrow">Architecture · Tech stack</p>
+<h2 class="title">The right tool for each job</h2>
+</div>
+<table class="tbl">
+<tr class="hd"><th style="width:17%">Part</th><th style="width:45%">Technology</th><th style="width:38%">Why</th></tr>
+<tr><td>Web app</td><td>React 18, TypeScript, Vite, Recharts</td><td>Fast, typed single-page app</td></tr>
+<tr><td>API</td><td>.NET 10, ASP.NET Core, EF Core, Dapper, FluentValidation, YARP</td><td>Security, business rules, storage</td></tr>
+<tr><td>Worker</td><td>Node.js 22, TypeScript, Fastify, Playwright, Zod</td><td>Best-in-class browser automation</td></tr>
+<tr><td>Database</td><td>Microsoft SQL Server, EF Core migrations</td><td>One system of record</td></tr>
+<tr><td>AI and voice</td><td>Anthropic and Gemini, MCP server, LiveKit</td><td>Optional and pluggable</td></tr>
+<tr><td>Quality</td><td>SonarAnalyzer, ESLint, Prettier, axe-core, Azure Pipelines</td><td>Warnings fail the build</td></tr>
+<tr><td>Dev tooling</td><td>.NET Aspire, OpenTelemetry</td><td>Hot reload and end-to-end traces</td></tr>
+</table>
+<aside>Mainstream, well-supported technologies only; nothing exotic for the client to worry about long term.
+
+If asked “why not one language?”: browser automation, Excel parsing and the schema-driven step engine are strongest in Node with Playwright and Zod; storage, security and structured business rules are strongest in .NET with SQL Server. The decision is recorded in our architecture decision records (ADR 0005), together with the plan to move features into .NET step by step where that pays off (ADR 0010).
+
+Playwright is Microsoft’s browser automation library; it is the engine that actually clicks in the browser.</aside>
+</section>

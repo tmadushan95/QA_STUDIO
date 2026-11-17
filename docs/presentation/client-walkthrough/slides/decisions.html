@@ -1,0 +1,21 @@
+<section id="decisions" class="alt">
+<div class="head">
+<p class="eyebrow">Engineering quality · Key decisions</p>
+<h2 class="title">Key decisions we made, and why</h2>
+</div>
+<table class="tbl sm">
+<tr class="hd"><th style="width:48%">Decision</th><th style="width:52%">Why</th></tr>
+<tr><td>Generic, data-only steps, not per-app code</td><td>Works on any web app; testers can edit; AI output can be checked</td></tr>
+<tr><td>SQL Server behind a .NET API; Node stays the runner</td><td>Enterprise storage and security; keep the proven Playwright engine</td></tr>
+<tr><td>TypeScript end to end in the worker</td><td>One language with the web app, no Python hybrid</td></tr>
+<tr><td>Each project has its own address, sign-in and accounts</td><td>Many client apps in one installation</td></tr>
+<tr><td>EF Core for writes, Dapper for reads</td><td>Transactions where needed, fast SQL for lists and dashboards</td></tr>
+<tr><td>Move worker features to .NET in stages</td><td>No big-bang rewrite and no web app change</td></tr>
+<tr><td>Aspire for development only</td><td>Hot reload and tracing for developers; a simple install for testers</td></tr>
+</table>
+<aside>Every one of these is recorded as an Architecture Decision Record in docs/adr, with the context, the options considered and the trade-offs. Offer to share them with the client’s architects.
+
+The one to explain if there is time is the staged move to .NET (ADR 0010). We already moved the dashboard, run-history reads, the page list and parameter values. Each move follows the same recipe, and the gateway means the web app never changes. This shows the client the platform has a clear, low-risk path to evolve.
+
+Mapping to ADR numbers: generic steps 0004, SQL Server and .NET 0005, TypeScript only 0002, per-project connection 0006, Dapper reads 0008, staged move 0010, Aspire 0012.</aside>
+</section>
