@@ -30,7 +30,21 @@ export class AnthropicClient implements LlmClient {
         max_tokens: req.maxTokens,
         ...(req.system && { system: req.system }),
         ...(req.temperature !== undefined && { temperature: req.temperature }),
-        messages: req.messages,
+        // Plain text stays a string; files become image or document blocks ahead of the text, as the API expects.
+        messages: req.messages.map((m) =>
+          m.attachments?.length
+            ? {
+                role: m.role,
+                content: [
+                  ...m.attachments.map((a) => ({
+                    type: a.mediaType === 'application/pdf' ? 'document' : 'image',
+                    source: { type: 'base64', media_type: a.mediaType, data: a.data },
+                  })),
+                  { type: 'text', text: m.content },
+                ],
+              }
+            : { role: m.role, content: m.content },
+        ),
       },
       {
         key: this.o.apiKey,

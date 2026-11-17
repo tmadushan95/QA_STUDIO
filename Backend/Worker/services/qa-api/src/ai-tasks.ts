@@ -25,7 +25,7 @@ import {
   type StepDraft,
 } from '@qa-studio/agents';
 import type { KnowledgeIndex } from '@qa-studio/knowledge';
-import { LlmError, completeJson } from '@qa-studio/llm';
+import { ATTACHMENT_TYPES, LlmError, completeJson } from '@qa-studio/llm';
 import type { ExploredPage } from '@qa-studio/execution-engine';
 import type { Run, TestCase } from '@qa-studio/shared';
 import type { AiService } from './ai-service.js';
@@ -131,6 +131,51 @@ const ProposeOptionsSchema = z.object({
   format: z.enum(CASE_FORMATS).optional(),
   spoken: z.boolean().optional(),
 });
+
+/** Most files one generation request may carry. */
+export const MAX_ATTACHMENTS = 5;
+/** Largest image or PDF, as base64 (about 4 MB of file); the page scales screenshots down well below this. */
+const MAX_ATTACHMENT_BASE64 = 5_600_000;
+/** Largest text file, in characters, and all text files together, so the prompt stays within the model's budget. */
+const MAX_ATTACHMENT_TEXT = 30_000;
+const MAX_ATTACHMENTS_TEXT = 60_000;
+
+/**
+ * Files attached to a generation request. Images and PDFs arrive base64-encoded and go to the model as files; text
+ * files arrive already read as text (`text/plain`) and go in as quoted data.
+ */
+const AttachmentsSchema = z
+  .array(
+    z.discriminatedUnion('mediaType', [
+      z.object({
+        name: z.string().trim().min(1).max(200),
+        mediaType: z.enum(ATTACHMENT_TYPES),
+        data: z
+          .string()
+          .min(1)
+          .max(MAX_ATTACHMENT_BASE64, 'A file is too large; attach files up to 4 MB.')
+          .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'A file could not be read.'),
+      }),
+      z.object({
+        name: z.string().trim().min(1).max(200),
+        mediaType: z.literal('text/plain'),
+        data: z.string().max(MAX_ATTACHMENT_TEXT, 'A text file is too long to send.'),
+      }),
+    ]),
+  )
+  .max(MAX_ATTACHMENTS, `Attach up to ${MAX_ATTACHMENTS} files.`)
+  .refine(
+    (list) =>
+      list.reduce((n, a) => n + (a.mediaType === 'text/plain' ? a.data.length : 0), 0) <=
+      MAX_ATTACHMENTS_TEXT,
+    'The attached text files are too long together; attach fewer.',
+  );
+
+/** The audit trail's note of attached files: how many, never their content. */
+const fileNote = (input: { files?: unknown[]; documents?: unknown[] }) => {
+  const n = (input.files?.length ?? 0) + (input.documents?.length ?? 0);
+  return n > 0 ? ` Files attached: ${n}.` : '';
+};
 
 /** The audit trail's note of which skills a generation used. */
 const skillNote = (u: SkillUsage) =>
@@ -333,14 +378,19 @@ export class AiTasks {
   }
 
   /** Ask for test cases from a description. `/skill-name` references apply saved skills. Nothing is saved. */
-  async previewCases(prompt: unknown, projectId?: number, options?: unknown): Promise<CasePreview> {
+  async previewCases(
+    prompt: unknown,
+    projectId?: number,
+    options?: unknown,
+    attachments?: unknown,
+  ): Promise<CasePreview> {
     try {
-      const { input, usage } = this.proposeInput(prompt, projectId, options);
+      const { input, usage } = this.proposeInput(prompt, projectId, options, attachments);
       const proposals = await proposeCases(input);
       this.d.audit(
         'ai.cases.preview',
         'test cases',
-        `${proposals.length} proposed.${skillNote(usage)}`,
+        `${proposals.length} proposed.${skillNote(usage)}${fileNote(input)}`,
       );
       return { cases: proposals, skills: usage };
     } catch (e) {
@@ -356,16 +406,19 @@ export class AiTasks {
     prompt: unknown,
     projectId?: number,
     options?: unknown,
+    attachments?: unknown,
   ): Promise<ProposeOutcome & { skills: SkillUsage }> {
     try {
-      const { input, usage } = this.proposeInput(prompt, projectId, options);
+      const { input, usage } = this.proposeInput(prompt, projectId, options, attachments);
       const out = await proposeOrAsk(input);
       this.d.audit(
         'ai.cases.preview',
         'test cases',
         (out.kind === 'cases'
           ? `${out.cases.length} proposed.`
-          : `${out.questions.length} clarifying question(s).`) + skillNote(usage),
+          : `${out.questions.length} clarifying question(s).`) +
+          skillNote(usage) +
+          fileNote(input),
       );
       return { ...out, skills: usage };
     } catch (e) {
@@ -374,7 +427,12 @@ export class AiTasks {
   }
 
   /** Validates a generation request, resolves its `/skill-name` references and builds the generator's input. */
-  private proposeInput(prompt: unknown, projectId: number | undefined, options: unknown) {
+  private proposeInput(
+    prompt: unknown,
+    projectId: number | undefined,
+    options: unknown,
+    attachments?: unknown,
+  ) {
     const p = z
       .string()
       .trim()
@@ -395,6 +453,17 @@ export class AiTasks {
       ...(o.data.format && { format: o.data.format }),
       ...(o.data.spoken && { spoken: true }),
     };
+    const a = AttachmentsSchema.safeParse(attachments ?? []);
+    if (!a.success) {
+      const message = a.error.issues[0]?.message ?? 'An attached file could not be used.';
+      throw new HttpError(400, 'invalid-attachments', message);
+    }
+    const files = a.data.flatMap((f) =>
+      f.mediaType === 'text/plain' ? [] : [{ mediaType: f.mediaType, data: f.data }],
+    );
+    const documents = a.data.flatMap((f) =>
+      f.mediaType === 'text/plain' ? [{ name: f.name, text: f.data }] : [],
+    );
     const resolved = this.resolve(p.data);
     return {
       usage: resolved.usage,
@@ -404,6 +473,8 @@ export class AiTasks {
         knowledge: this.d.knowledge,
         ...(this.d.pages && { pages: this.d.pages(projectId) }),
         ...(resolved.skills.length > 0 && { skills: resolved.skills }),
+        ...(files.length > 0 && { files }),
+        ...(documents.length > 0 && { documents }),
         ...tuning,
       },
     };

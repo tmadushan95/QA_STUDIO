@@ -203,6 +203,55 @@ describe('GeminiClient', () => {
     expect(e.message).toContain('switch provider in Settings');
   });
 
+  it('sends attached screenshots and PDFs in each provider’s own shape, ahead of the text', async () => {
+    const message = {
+      role: 'user' as const,
+      content: 'Write cases',
+      attachments: [
+        { mediaType: 'image/png' as const, data: 'iVBORw0KGgo=' },
+        { mediaType: 'application/pdf' as const, data: 'JVBERi0=' },
+      ],
+    };
+    const anthropicSeen: { url?: string; init?: RequestInit }[] = [];
+    await new AnthropicClient({
+      apiKey: KEY,
+      model: 'm1',
+      fetch: fetchReturning(200, { content: [{ type: 'text', text: 'ok' }] }, anthropicSeen),
+    }).complete({ messages: [message], maxTokens: 10 });
+    expect(JSON.parse(String(anthropicSeen[0]!.init!.body)).messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' },
+          },
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERi0=' },
+          },
+          { type: 'text', text: 'Write cases' },
+        ],
+      },
+    ]);
+
+    const geminiSeen: { url?: string; init?: RequestInit }[] = [];
+    await new GeminiClient({
+      apiKey: KEY,
+      model: 'g1',
+      fetch: fetchReturning(
+        200,
+        { candidates: [{ content: { parts: [{ text: 'ok' }] } }] },
+        geminiSeen,
+      ),
+    }).complete({ messages: [message], maxTokens: 10 });
+    expect(JSON.parse(String(geminiSeen[0]!.init!.body)).contents[0].parts).toEqual([
+      { inline_data: { mime_type: 'image/png', data: 'iVBORw0KGgo=' } },
+      { inline_data: { mime_type: 'application/pdf', data: 'JVBERi0=' } },
+      { text: 'Write cases' },
+    ]);
+  });
+
   it('createClient picks the adapter for the provider', () => {
     expect(createClient({ provider: 'gemini', apiKey: 'k', model: 'm' }).provider).toBe('gemini');
     expect(createClient({ provider: 'anthropic', apiKey: 'k', model: 'm' }).provider).toBe(

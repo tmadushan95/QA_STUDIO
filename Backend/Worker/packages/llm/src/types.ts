@@ -1,9 +1,28 @@
 export const PROVIDERS = ['anthropic', 'gemini'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
+/** The file types a model reads natively, beside the text: screenshots and PDF documents. */
+export const ATTACHMENT_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+] as const;
+export type AttachmentType = (typeof ATTACHMENT_TYPES)[number];
+
+/** A file sent with a message, read by the model as an image or a document. */
+export interface LlmAttachment {
+  mediaType: AttachmentType;
+  /** The file's bytes, base64-encoded (no `data:` prefix). */
+  data: string;
+}
+
 export interface LlmMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Files shown to the model before the text; only user messages carry them. */
+  attachments?: LlmAttachment[];
 }
 
 export interface LlmRequest {

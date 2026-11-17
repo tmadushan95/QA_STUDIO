@@ -1,16 +1,15 @@
 /*
- * GenerateCasesPanel: the prompt on top, the proposals under it.
+ * GenerateCasesPanel: a chat-style column (conversation above, prompt box at its foot) and a side panel with the
+ * proposals once there are some. The layout depends on the room the panel itself has (a page or a dialog), so it uses
+ * container queries rather than the viewport.
  */
-.panel,
+.panel {
+  container-type: inline-size;
+}
 .workspace {
   display: grid;
-  gap: var(--space-5);
-}
-.output {
-  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
-  min-width: 0;
-  align-content: start;
 }
 .sub {
   margin: 0;
@@ -23,44 +22,442 @@
   font-size: var(--text-xs);
 }
 
-/* The composer: a soft card holding one prompt box and a row of settings for the request. */
-.composer {
+/*
+ * The shell: the chats list beside the active chat. Docked, it runs from where it starts on the page (--dock-top,
+ * measured by the component) to the bottom of the window, less the page's bottom padding, so the prompt box sits at
+ * the foot of the screen and only the lists, the conversation and the results panel scroll.
+ */
+.shell {
+  position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.shell[data-docked] {
+  --dock-bottom: var(--space-6);
+  height: calc(100dvh - var(--dock-top, 0px) - var(--dock-bottom));
+  min-height: 26rem;
+}
+@media (max-width: 47.5rem) {
+  .shell[data-docked] {
+    --dock-bottom: calc(var(--bottombar-height) + var(--space-6));
+  }
+}
+/* The active chat: its own container, so its layout follows the room left beside the chats list. */
+.main {
+  container-type: inline-size;
+  min-width: 0;
+  min-height: 0;
+}
+.shell[data-docked] .main,
+.workspace[data-docked] {
+  height: 100%;
+}
+.workspace[data-docked] > * {
+  min-height: 0;
+}
+
+/* The chats list: hidden until there is room for it (or it is asked for), then a column on the left. */
+.rail {
+  display: none;
+  flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5);
-  border: 1px solid var(--color-primary-border);
+  min-height: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  background: var(--gradient-hero);
+  background: var(--color-surface);
 }
-.composer[data-compact] {
-  padding: var(--space-4);
+.scrim {
+  display: none;
 }
-/* The prompt box: the text area and its bottom edge (examples, Generate) read as one input, ringed when focused. */
-.promptBox {
+@container (min-width: 64rem) {
+  .shell[data-rail='open'],
+  .shell[data-rail='auto']:not([data-panel]) {
+    grid-template-columns: 15.5rem minmax(0, 1fr);
+  }
+  .shell[data-rail='open'] .rail,
+  .shell[data-rail='auto']:not([data-panel]) .rail {
+    display: flex;
+  }
+  /* Room for the list only: its own close button is the header toggle's job here. */
+  .railHead button {
+    display: none;
+  }
+}
+/* Narrow: the list floats over the chat when asked for, with a scrim that closes it. */
+@container (max-width: 64rem) {
+  .shell[data-rail='open'] .rail {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 6;
+    display: flex;
+    width: min(19rem, 88%);
+    box-shadow: var(--shadow-lg);
+    animation: rail-in 180ms var(--ease) both;
+  }
+  .shell[data-rail='open'] .scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: block;
+    border-radius: var(--radius-xl);
+    background: rgb(11 19 36 / 0.28);
+  }
+}
+@keyframes rail-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+.railHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2.25rem;
+  padding-left: var(--space-2);
+}
+.newChat {
+  justify-content: flex-start;
+  width: 100%;
+}
+.railList {
+  display: grid;
+  flex: 1;
+  gap: var(--space-4);
+  align-content: start;
+  min-height: 0;
+  margin: 0 calc(-1 * var(--space-1));
+  padding: 0 var(--space-1);
+  overflow-y: auto;
+}
+.railEmpty {
+  margin: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.railGroup {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.railItems {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* A chat: its name and what it holds; the "⋯" menu shows on hover, focus, or when it is the open chat. */
+.railItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-md);
+}
+.railItem:hover,
+.railItem[data-active] {
+  background: var(--color-subtle);
+}
+.railItem[data-active] {
+  box-shadow: inset 2px 0 0 var(--color-primary);
+}
+.railItem > :last-child {
+  opacity: 0;
+}
+.railItem:hover > :last-child,
+.railItem:focus-within > :last-child,
+.railItem[data-active] > :last-child {
+  opacity: 1;
+}
+@media (hover: none) {
+  .railItem > :last-child {
+    opacity: 1;
+  }
+}
+.railLink {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+  min-width: 0;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.railLink:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.railTitle,
+.railMeta {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.railTitle {
+  font-size: var(--text-sm);
+}
+.railItem[data-active] .railTitle {
+  font-weight: var(--weight-semibold);
+}
+.railMeta {
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+}
+.railRename {
+  flex: 1;
+  min-height: 2.25rem;
+  margin: var(--space-1);
+}
+
+/* The bar above the conversation: chats toggle, the chat's name, new chat. */
+.chatHead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+.chatTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The conversation column. */
+.chat {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--color-border-strong);
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 48rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+.workspace[data-docked] .chat {
+  height: 100%;
+}
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 0;
+  padding: var(--space-2) var(--space-1);
+}
+.workspace[data-docked] .thread {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* Before the first request: a greeting and example requests, centred in the conversation's space. */
+.greeting {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  margin-block: auto;
+  padding: var(--space-6) 0;
+  text-align: center;
+}
+.greetingMark {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--gradient-brand);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
+.greetingTitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+}
+.greeting > .sub {
+  max-width: 30rem;
+  font-size: var(--text-sm);
+}
+.examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-4);
+}
+.example {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--duration) var(--ease),
+    color var(--duration) var(--ease);
+}
+.example svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-accent);
+}
+.example:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+/* A request, as the person's message: a soft bubble on the right. */
+.exchange {
+  display: grid;
+  gap: var(--space-3);
+}
+.userMessage {
+  justify-self: end;
+  max-width: 85%;
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* The AI's reply: an avatar, then a note or a card for its result. */
+.turn {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  background: var(--gradient-brand);
+  color: #fff;
+}
+.turnBody {
+  display: grid;
+  flex: 1;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.note {
+  margin: 0;
+  padding-top: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+.resultCard {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  max-width: 26rem;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition:
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+.resultCard:hover,
+.resultCard[data-active] {
+  border-color: var(--color-primary-border);
+  box-shadow: var(--shadow-md);
+}
+.resultCard:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.resultIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.resultText {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+.resultAction {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+/* The composer at the column's foot: the prompt box and a one-line reminder under it. */
+.composer {
+  display: grid;
+  flex: none;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+/* The prompt box: the text area and its bottom edge read as one input, ringed when focused. */
+.promptBox {
+  /* Its own container, so the bottom bar can drop the key hint when the box is narrow. */
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-strong);
+  border-radius: calc(var(--radius-xl) + 4px);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
   transition:
     border-color var(--duration) var(--ease),
     box-shadow var(--duration) var(--ease);
 }
 .promptBox:focus-within {
   border-color: var(--color-primary);
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--shadow-md), var(--focus-ring);
 }
+/* Grows with its text (height set from the content in the component) between these bounds, then scrolls. */
 .promptInput {
-  min-height: 0;
-  padding: var(--space-3) var(--space-4);
+  min-height: 3.25rem;
+  max-height: min(40vh, 20rem);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  overflow-y: auto;
   border: 0;
-  border-radius: 0;
+  border-radius: calc(var(--radius-xl) + 4px) calc(var(--radius-xl) + 4px) 0 0;
   background: transparent;
   font-size: var(--text-md);
   line-height: 1.55;
-  resize: vertical;
+  resize: none;
 }
 /* The box itself shows focus, so the text area inside does not draw a second ring. */
 .promptInput:focus-visible {
@@ -68,59 +465,195 @@
 }
 .promptBar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-  border-top: 1px solid var(--color-border);
-  background: var(--color-subtle);
-}
-.generate {
-  margin-left: auto;
-}
-.examples {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+}
+/* Coverage as a quiet pill rather than a full-width form field. */
+/* It may shrink below its longest option ("Thorough…"), so the send button always stays inside the box. */
+.coverageSelect {
+  flex: 0 1 auto;
+  width: auto;
   min-width: 0;
-}
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
+  max-width: 13rem;
+  min-height: 2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-color: transparent;
   border-radius: var(--radius-full);
-  background: var(--color-surface);
+  background-color: var(--color-subtle);
   color: var(--color-text-secondary);
   font-size: var(--text-xs);
-  cursor: pointer;
 }
-.chip:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+.keyHint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
 }
-/* The request's settings: skills, where to save, write steps, side by side and wrapping as room runs out. */
-.options {
+.keyHint kbd {
+  padding: 0 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-subtle);
+  font-family: inherit;
+  font-size: 0.6875rem;
+}
+/* Round send button, like a chat app's. */
+.send {
+  flex: none;
+  width: 2.25rem;
+  min-width: 0;
+  height: 2.25rem;
+  min-height: 0;
+  margin-left: auto;
+  padding: 0;
+  border-radius: var(--radius-full);
+}
+.disclaimer {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  text-align: center;
+}
+
+/* The side panel: a framed column with a title bar, like a document opened beside a chat. */
+.side {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-subtle);
+  box-shadow: var(--shadow-md);
+  animation: side-in 220ms var(--ease) both;
+}
+.sideHead {
+  display: flex;
+  flex: none;
   align-items: center;
-  gap: var(--space-3) var(--space-6);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--color-surface);
 }
-/* Coverage: a label and its drop-down on one line. */
-.coverage {
-  display: flex;
+.sideTitle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-semibold);
+}
+.sideWhere {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sideBody {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  min-height: 0;
+  padding: var(--space-4);
+}
+/* Docked, the panel fills the workspace's height and scrolls inside, so its save bar sticks to the panel, not the page. */
+.workspace[data-docked] .side {
+  height: 100%;
+}
+.workspace[data-docked] .sideBody {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* While the AI writes: placeholder cards, so the panel shows where results will land. */
+.writing {
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+.writing > p {
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
 }
-/* Saved skills: a chip puts /name into the prompt. */
-.skills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+.skeleton {
+  display: grid;
   gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.skeleton span {
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    var(--color-subtle) 0%,
+    var(--color-border) 50%,
+    var(--color-subtle) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+.skeleton span:first-child {
+  width: 55%;
+  height: 1rem;
+}
+.skeleton span:last-child {
+  width: 80%;
+}
+@keyframes side-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .side,
+  .skeleton span {
+    animation: none;
+  }
+}
+
+/* Room for both: conversation on the left, panel on the right. */
+@container (min-width: 52rem) {
+  .workspace[data-panel] {
+    grid-template-columns: minmax(20rem, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+  .workspace[data-docked][data-panel] {
+    align-items: stretch;
+  }
+  /* Not docked (a dialog): the panel sticks under the page's top bar with its own scroll. */
+  .workspace:not([data-docked]) .side {
+    position: sticky;
+    top: calc(var(--generate-sticky-top, 0px) + var(--space-4));
+    max-height: calc(100dvh - var(--generate-sticky-top, 0px) - var(--space-8));
+  }
+  .workspace:not([data-docked]) .sideBody {
+    overflow-y: auto;
+  }
+}
+/* Docked without room for both: the open panel takes the column's place, and closing it brings the chat back. */
+@container (max-width: 52rem) {
+  .workspace[data-docked][data-panel] .chat {
+    display: none;
+  }
 }
 
 /* Results. */
@@ -128,34 +661,108 @@
   display: grid;
   gap: var(--space-3);
 }
-/* The bar above the cards: count, where they go, and "Save selected", kept in reach while the cards scroll. */
+/*
+ * The summary above the cards: how many, what they cover, and select all/none. It scrolls with the cards: Save lives in
+ * the save bar pinned to the panel's foot, so nothing here needs to stay in view (a sticky bar here let the cards show
+ * through the panel's top padding behind it).
+ */
 .resultsHead {
-  position: sticky;
-  /* Below whatever sticks above the panel; the page that hosts it says how tall that is. */
-  top: var(--generate-sticky-top, 0px);
-  z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+}
+.resultsHead > div {
+  display: grid;
+  flex: 1 1 16rem;
+  gap: var(--space-1);
+  min-width: 0;
 }
 .resultsTitle {
   font-size: var(--text-md);
 }
+/*
+ * The save bar, fixed under the panel title (outside the scrolling cards): where to file the cases, then the steps
+ * switch beside Discard and Save. Both rows wrap on a narrow panel.
+ */
+.saveBar {
+  display: grid;
+  flex: none;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.saveWhere {
+  min-width: 0;
+}
+.saveRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+/* "Write runnable steps" as a switch; its title says what it does. */
+.stepsToggle {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  appearance: none;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.25rem - 4px);
+  height: calc(1.25rem - 4px);
+  border-radius: var(--radius-full);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration) var(--ease);
+}
+.switch:checked {
+  background: var(--color-primary);
+}
+.switch:checked::after {
+  transform: translateX(1rem);
+}
+.switch:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+  margin-left: auto;
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  /* One case per row: the panel is a reading column, and full-width cards keep long titles and steps readable. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   margin: 0;
   padding: 0;
@@ -211,12 +818,16 @@
   margin-top: 2px;
 }
 @media (max-width: 40rem) {
-  .composer {
-    padding: var(--space-4);
+  .keyHint {
+    display: none;
   }
-  .generate,
-  .actions > button:last-child {
+  /* Phones: Discard and Save share the row's full width, Save taking the larger part. */
+  .actions {
+    flex-wrap: nowrap;
     width: 100%;
+  }
+  .actions > button:last-child {
+    flex: 1;
   }
 }
 /* A proposal's title: wraps over two lines instead of being cut off. */
@@ -224,4 +835,94 @@
   min-height: 0;
   resize: vertical;
   font-weight: var(--weight-semibold);
+}
+
+/* Attachments: chips inside the prompt box above the text, and file names on a sent message. */
+.promptBox[data-dragging] {
+  border-style: dashed;
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.fileChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-3) 0;
+  list-style: none;
+}
+.fileChip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: min(16rem, 100%);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-subtle);
+}
+.fileThumb,
+.fileIcon {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+}
+.fileThumb {
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+}
+.fileIcon {
+  display: grid;
+  place-items: center;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+.fileText {
+  display: grid;
+  min-width: 0;
+}
+.fileName {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fileRemove {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+.userMessage p {
+  margin: 0;
+}
+.sentFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+.sentFiles li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 14rem;
+  padding: 2px var(--space-2);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A narrow prompt box (beside the results panel, or on a phone) has no room for the key hint, so it is not cut off. */
+@container (max-width: 34rem) {
+  .keyHint {
+    display: none;
+  }
 }

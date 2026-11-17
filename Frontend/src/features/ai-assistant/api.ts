@@ -133,19 +133,40 @@ export interface ProposeResult {
 
 /**
  * Ask the AI for test cases. `projectId` lets it use that project's page names in the steps; `/skill-name` in the
- * prompt applies a saved skill; `options` picks the coverage. Nothing is saved.
+ * prompt applies a saved skill; `options` picks the coverage; `attachments` are screenshots and files that show the
+ * feature. Nothing is saved.
  */
 export async function proposeCases(
   prompt: string,
   projectId?: number,
   options?: ProposeOptions,
+  attachments?: PromptAttachment[],
 ): Promise<ProposeResult> {
   const r = await send<{ cases?: ProposedCase[]; skills?: SkillUsage }>('/api/ai/cases/preview', {
     prompt,
     ...(projectId ? { projectId } : {}),
     ...(options ? { options } : {}),
+    ...(attachments?.length && {
+      attachments: attachments.map(({ name, mediaType, data }) => ({ name, mediaType, data })),
+    }),
   });
   return { cases: Array.isArray(r?.cases) ? r.cases : [], skills: r?.skills ?? NO_SKILLS };
+}
+
+/**
+ * A file sent with a generation request: an image or PDF (base64, read by the model) or a text file (`text/plain`,
+ * its text), as `promptFiles.ts` prepares it.
+ */
+export interface PromptAttachment {
+  name: string;
+  mediaType:
+    | 'image/png'
+    | 'image/jpeg'
+    | 'image/webp'
+    | 'image/gif'
+    | 'application/pdf'
+    | 'text/plain';
+  data: string;
 }
 
 /** Optional tuning of a generation request. Leaving it out keeps the standard behaviour. */

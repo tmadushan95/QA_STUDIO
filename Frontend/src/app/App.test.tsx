@@ -5,6 +5,7 @@
  * Sign-in Users, Azure DevOps, project versions, the dashboard and the settings sub-menu.
  */
 import '@testing-library/jest-dom/vitest';
+import { StrictMode } from 'react';
 import { cleanup, configure, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -1185,8 +1186,6 @@ describe('test case studio', () => {
     go(`${HOME}/ai-assistant`);
     const user = userEvent.setup();
     render(<App />);
-    expect(await screen.findByText(/Save to General · v1\.0/)).toBeInTheDocument();
-    await user.selectOptions(await screen.findByLabelText('Test suite'), 'Projects');
     // An example chip says what it is about and fills in its whole prompt.
     const prompt = await screen.findByLabelText(/What should be tested/);
     await user.click(screen.getByRole('button', { name: /Create, edit and delete a draft/ }));
@@ -1198,6 +1197,18 @@ describe('test case studio', () => {
     await user.click(screen.getByRole('button', { name: 'Generate test cases' }));
     expect(await screen.findByDisplayValue('Wrong password')).toBeInTheDocument();
     expect(server.sent('POST', '/api/ai/cases')).toHaveLength(0);
+    // Like a chat, the request becomes a message and the box empties for the next one.
+    expect(prompt).toHaveValue('');
+    // It is a chat session, named after the request and listed with the other chats.
+    expect(
+      within(screen.getByRole('navigation', { name: 'Chats' })).getByRole('button', {
+        current: true,
+      }),
+    ).toHaveTextContent('Sign in with good and bad passwords');
+    // Where to file them is chosen in the panel, before saving: the header's version by default, and a suite.
+    const saveTo = screen.getByRole('group', { name: 'Where to save' });
+    expect(within(saveTo).getByLabelText('Version')).toHaveDisplayValue('v1.0');
+    await user.selectOptions(within(saveTo).getByLabelText('Test suite'), 'Projects');
     await user.click(screen.getByRole('checkbox', { name: 'Keep "Wrong password"' }));
     await user.click(screen.getByRole('button', { name: 'Save selected (1)' }));
     await waitFor(() => expect(server.sent('POST', '/api/ai/cases')).toHaveLength(1));
@@ -1264,6 +1275,45 @@ describe('test case studio', () => {
     ).toBeInTheDocument();
   });
 
+  it('sends attached files with the request, shows them on the message and clears the box', async () => {
+    const server = fakeServer({
+      'GET /api/ai': () => ({ provider: 'anthropic', ready: true }),
+      'POST /api/ai/cases/preview': () => ({
+        cases: [{ title: 'Owner deletes a draft', steps: ['x'], expectedResult: 'Gone' }],
+      }),
+    });
+    go(`${HOME}/ai-assistant`);
+    const user = userEvent.setup();
+    // StrictMode, as the app runs in development: effects run twice, and the chat must survive it.
+    const { container } = render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+    const prompt = await screen.findByLabelText(/What should be tested/);
+    const picker = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    await user.upload(picker, new File(['Only owners may delete.'], 'rules.md', { type: '' }));
+    const chips = await screen.findByRole('list', { name: 'Files to send' });
+    expect(within(chips).getByText('rules.md')).toBeInTheDocument();
+    await user.type(prompt, 'Delete a draft project');
+    await user.click(screen.getByRole('button', { name: 'Generate test cases' }));
+    expect(await screen.findByDisplayValue('Owner deletes a draft')).toBeInTheDocument();
+    expect(server.sent('POST', '/api/ai/cases/preview')[0]!.body).toMatchObject({
+      attachments: [{ name: 'rules.md', mediaType: 'text/plain', data: 'Only owners may delete.' }],
+    });
+    // Sent: the box and its file list are empty again, and the message names the file.
+    expect(prompt).toHaveValue('');
+    expect(screen.queryByRole('list', { name: 'Files to send' })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('navigation', { name: 'Chats' })).getByRole('button', {
+        current: true,
+      }),
+    ).toHaveTextContent('Delete a draft project');
+    expect(
+      within(screen.getByRole('list', { name: 'Attached files' })).getByText(/rules\.md/),
+    ).toBeInTheDocument();
+  });
+
   it('keeps unsaved proposals when the page is left and opened again, until they are discarded', async () => {
     fakeServer({
       'GET /api/ai': () => ({ provider: 'anthropic', ready: true }),
@@ -1284,24 +1334,33 @@ describe('test case studio', () => {
     await user.click(screen.getByRole('button', { name: 'Generate test cases' }));
     await user.click(await screen.findByRole('checkbox', { name: 'Keep "Viewer cannot delete"' }));
 
-    // Leaving the page unmounts the panel; opening it again brings back the prompt, the cards and the ticks.
+    // Leaving the page unmounts the panel; opening it again brings back the conversation, the cards and the ticks.
     cleanup();
     go(`${HOME}/ai-assistant`);
     render(<App />);
     expect(await screen.findByDisplayValue('Viewer cannot delete')).toBeInTheDocument();
-    expect(screen.getByLabelText(/What should be tested/)).toHaveValue('Delete a draft project');
+    expect(
+      within(screen.getByRole('navigation', { name: 'Chats' })).getByRole('button', {
+        current: true,
+      }),
+    ).toHaveTextContent('Delete a draft project');
+    expect(screen.getByLabelText(/What should be tested/)).toHaveValue('');
     expect(screen.getByRole('checkbox', { name: 'Keep "Delete a draft"' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Keep "Viewer cannot delete"' })).not.toBeChecked();
 
-    // Discard forgets them for good: the prompt stays to try again, the cards do not come back.
+    // Discard forgets the cards for good; the chat itself stays, and "New chat" starts afresh.
     await user.click(screen.getByRole('button', { name: 'Discard' }));
     cleanup();
     go(`${HOME}/ai-assistant`);
     render(<App />);
-    expect(await screen.findByLabelText(/What should be tested/)).toHaveValue(
-      'Delete a draft project',
-    );
+    expect(await screen.findByRole('navigation', { name: 'Chats' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Proposed test cases' })).not.toBeInTheDocument();
+    await user.click(
+      within(screen.getByRole('main')).getAllByRole('button', { name: 'New chat' })[0]!,
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'What should be tested?' }),
+    ).toBeInTheDocument();
   });
 
   it('fills in the next ID for a new case and files it in the chosen version', async () => {

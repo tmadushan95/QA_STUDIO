@@ -1000,17 +1000,26 @@ export function createApp(
   app.post('/api/ai/steps/revise', (req) => tasksOr404().reviseSteps(req.body));
   app.get('/api/ai/explore', () => ({ defaultPaths: DEFAULT_EXPLORE_PATHS, max: MAX_EXPLORE }));
   app.post('/api/ai/explore', async (req) => ({ items: await tasksOr404().explore(req.body) }));
-  app.post('/api/ai/cases/preview', async (req) => {
-    const body = (req.body ?? {}) as { prompt?: unknown; projectId?: unknown; options?: unknown };
+  // Generation requests may carry attached screenshots and files (checked in ai-tasks), so they get room beyond the
+  // default 1 MB body; every other route keeps the default.
+  const withFiles = { bodyLimit: 16 * 1024 * 1024 };
+  type GenerateBody = {
+    prompt?: unknown;
+    projectId?: unknown;
+    options?: unknown;
+    attachments?: unknown;
+  };
+  app.post('/api/ai/cases/preview', withFiles, async (req) => {
+    const body = (req.body ?? {}) as GenerateBody;
     // The project decides which page names the AI may use in steps.
     const projectId = z.number().int().positive().optional().parse(body.projectId);
-    return tasksOr404().previewCases(body.prompt, projectId, body.options);
+    return tasksOr404().previewCases(body.prompt, projectId, body.options, body.attachments);
   });
   // Same as preview, but the model may answer with clarifying questions instead (the voice conversation uses it).
-  app.post('/api/ai/cases/ask', async (req) => {
-    const body = (req.body ?? {}) as { prompt?: unknown; projectId?: unknown; options?: unknown };
+  app.post('/api/ai/cases/ask', withFiles, async (req) => {
+    const body = (req.body ?? {}) as GenerateBody;
     const projectId = z.number().int().positive().optional().parse(body.projectId);
-    return tasksOr404().askOrPreviewCases(body.prompt, projectId, body.options);
+    return tasksOr404().askOrPreviewCases(body.prompt, projectId, body.options, body.attachments);
   });
   // Saved skills: `/skill-name` in a generation prompt applies one. The change is announced by the hook on writes.
   const skillsOr404 = () => {

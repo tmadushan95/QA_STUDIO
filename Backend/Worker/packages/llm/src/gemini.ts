@@ -30,7 +30,13 @@ export class GeminiClient implements LlmClient {
         ...(req.system && { systemInstruction: { parts: [{ text: req.system }] } }),
         contents: req.messages.map((m) => ({
           role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
+          // Files go in as inline data ahead of the text.
+          parts: [
+            ...(m.attachments ?? []).map((a) => ({
+              inline_data: { mime_type: a.mediaType, data: a.data },
+            })),
+            { text: m.content },
+          ],
         })),
         generationConfig: {
           maxOutputTokens: req.maxTokens,

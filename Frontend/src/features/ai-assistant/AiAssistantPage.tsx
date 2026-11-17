@@ -110,13 +110,17 @@ export function AiAssistantPage() {
 }
 
 /**
- * Tab 1: the shared generator. New cases are saved in the project and version chosen in the header; only the suite is
- * picked here ("By module" files each case in a suite named after its module).
+ * Tab 1: the shared generator, docked like a chat. New cases go to the project chosen in the header; the version (the
+ * header's by default) and the suite ("Suite per module" files each case in a suite named after its module) are
+ * picked in the save bar, when saving.
  */
 function Generate({ status }: { status: Parameters<typeof GenerateCasesPanel>[0]['status'] }) {
-  const { project, version } = useProjectScope();
+  const { project, versions, versionId: headerVersionId } = useProjectScope();
   const allSuites = useResource(fetchSuites);
   const [suiteId, setSuiteId] = useState(0);
+  // Undefined follows the header; choosing here files this batch elsewhere without changing the whole app's scope.
+  const [versionId, setVersionId] = useState<number>();
+  const version = versions.find((v) => v.id === (versionId ?? headerVersionId));
   const suites = (allSuites.data ?? []).filter((s) => s.projectId === project?.id && s.isActive);
   const suite = suites.find((s) => s.id === suiteId);
   const where = `${project?.name ?? 'this project'}${version ? ` · v${version.name}` : ''}`;
@@ -124,6 +128,7 @@ function Generate({ status }: { status: Parameters<typeof GenerateCasesPanel>[0]
 
   return (
     <GenerateCasesPanel
+      docked
       status={status}
       target={{
         ...(project && { projectId: project.id }),
@@ -134,25 +139,32 @@ function Generate({ status }: { status: Parameters<typeof GenerateCasesPanel>[0]
       targetControls={
         <div className={styles.saveTo}>
           <span className={styles.saveToLabel}>
-            <Icon name="folder" size={14} /> Save to {where}
+            <Icon name="folder" size={14} /> Save to {project?.name ?? 'this project'}
           </span>
+          <Select
+            aria-label="Version"
+            value={version?.id ?? 0}
+            onChange={(e) => setVersionId(Number(e.target.value))}
+          >
+            <option value={0}>No version</option>
+            {versions.map((v) => (
+              <option key={v.id} value={v.id}>
+                v{v.name}
+              </option>
+            ))}
+          </Select>
           <Select
             aria-label="Test suite"
             value={suite?.id ?? 0}
             onChange={(e) => setSuiteId(Number(e.target.value))}
           >
-            <option value={0}>By module</option>
+            <option value={0}>Suite per module</option>
             {suites.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
           </Select>
-          {!version && (
-            <span className={styles.saveToHint}>
-              No version: choose one in the header to file them under a release.
-            </span>
-          )}
         </div>
       }
     />

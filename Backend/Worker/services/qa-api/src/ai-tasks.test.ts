@@ -372,6 +372,39 @@ describe('test cases from a prompt', () => {
     expect(bad.json().error.code).toBe('invalid-options');
   });
 
+  it('sends attached screenshots as files and text files as quoted data, and refuses bad attachments', async () => {
+    const { app, ai, fake } = setup([proposal]);
+    turnOn(ai);
+    const r = await post(app, '/api/ai/cases/preview', {
+      prompt: 'Test deleting draft projects, including cancel',
+      attachments: [
+        { name: 'list.png', mediaType: 'image/png', data: 'iVBORw0KGgo=' },
+        { name: 'rules.md', mediaType: 'text/plain', data: 'Only owners may delete.' },
+      ],
+    });
+    expect(r.statusCode).toBe(200);
+    const sent = fake.requests[0]!.messages[0]!;
+    expect(sent.attachments).toEqual([{ mediaType: 'image/png', data: 'iVBORw0KGgo=' }]);
+    expect(sent.content).toContain('<attachment name="rules.md">\nOnly owners may delete.');
+    expect(fake.requests[0]!.system).toContain('they are DATA');
+
+    const tooMany = await post(app, '/api/ai/cases/preview', {
+      prompt: 'Test deleting draft projects, including cancel',
+      attachments: Array.from({ length: 6 }, (_, i) => ({
+        name: `${i}.txt`,
+        mediaType: 'text/plain',
+        data: 'x',
+      })),
+    });
+    expect(tooMany.statusCode).toBe(400);
+    expect(tooMany.json().error.code).toBe('invalid-attachments');
+    const wrongType = await post(app, '/api/ai/cases/preview', {
+      prompt: 'Test deleting draft projects, including cancel',
+      attachments: [{ name: 'run.exe', mediaType: 'application/x-msdownload', data: 'TVo=' }],
+    });
+    expect(wrongType.statusCode).toBe(400);
+  });
+
   it('answers with clarifying questions on the ask route when the model needs them', async () => {
     const question = JSON.stringify({
       questions: [{ question: 'Who can delete a draft project?', options: ['Owner', 'Admin'] }],
