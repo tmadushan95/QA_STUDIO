@@ -37,6 +37,7 @@ import { EventBus } from './events.js';
 import { isLoopbackHost } from './security.js';
 import { loadSecretKey, SecretBox } from './secrets.js';
 import { SettingsService } from './settings-service.js';
+import { withClient } from './request-client.js';
 import { MemoryStore } from './store.js';
 import { startTelemetry } from './telemetry.js';
 
@@ -111,7 +112,7 @@ const box = new SecretBox(
   }),
 );
 const audit = (action: string, target: string, detail: string) =>
-  storage.addAudit(action, target, detail);
+  storage.addAudit(action, target, withClient(detail));
 
 const settings = new SettingsService({
   store: storage,

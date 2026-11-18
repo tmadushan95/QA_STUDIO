@@ -28,34 +28,77 @@ Reading pages is enforced as read-only in the browser: after sign-in, every requ
 
 ## MCP server (for Claude Code, Claude Desktop or any MCP client)
 
-`services/qa-mcp` exposes the platform as MCP tools over stdio. It holds no data: every tool calls the running
-platform's API, so the same validation, audit trail and safety switches apply.
+`services/qa-mcp` exposes the whole platform to an AI assistant as MCP tools, resources and prompts. It holds no
+data: every tool calls the .NET API (which forwards the worker's routes), so the same validation, audit trail and
+safety switches apply. Changes it makes are marked "(via mcp)" in the audit trail. The design is in
+[ADR 0013](adr/0013-mcp-server-for-the-whole-platform.md).
 
-| Tool                                                                                                             | Kind                                                                              |
-| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `search_test_cases`, `get_test_case`, `list_actions`, `search_knowledge`, `get_scenario`, `list_runs`, `get_run` | read only                                                                         |
-| `save_scenario_draft`                                                                                            | writes a **draft** (marked "via MCP"); never runs until approved in the dashboard |
-| `start_run`                                                                                                      | runs approved scenarios in real browsers against the configured QA environment    |
+### Tools, in toolsets
 
-There is deliberately **no** tool to approve a scenario, delete anything, change settings or read a key.
+`QA_MCP_TOOLSETS` picks which groups are offered (default `read,author,operate`). A tool outside them is never
+registered, so the assistant does not see it.
 
-Start the platform (`qa-studio` or `npm start`), build once (`npm run build`), then register the server with your client.
-For Claude Code, a project `.mcp.json`:
+- **read** (always on): `list_projects`, `get_project`, `list_project_versions`, `list_test_suites`,
+  `get_test_suite`, `list_pages`, `search_test_cases`, `get_test_case`, `get_next_case_id`, `get_parameter_summary`,
+  `get_case_parameters`, `get_common_parameters`, `list_actions`, `search_knowledge`, `get_scenario`,
+  `get_scenario_history`, `validate_scenario`, `list_runs`, `get_run`, `get_run_report`, `wait_for_run`,
+  `list_ai_jobs`, `get_ai_job`, `wait_for_ai_job`, `list_skills`, `get_dashboard`, `get_insights`, `list_audit`,
+  `get_work_item`, `get_azure_devops_job`. Secret-looking parameter values are shown as `[hidden]`.
+- **author**: create and update projects, versions, suites and test cases; move, reorder and assign versions;
+  set and suggest parameters; `save_scenario_draft` and `discard_scenario_draft`; `propose_test_cases` (saves
+  nothing) and `add_test_cases`; `generate_scenario_drafts`, `revise_scenario_steps`, `diagnose_failed_case`,
+  `cancel_ai_job`.
+- **operate**: `plan_run`, `start_run`, `rerun_failed_cases`, `cancel_run`, `start_azure_devops_pipeline`.
+- **defects** (off by default): `report_defect`, `list_reported_defects`. See "Filing bugs" below.
+- **admin** (off by default): `delete_project`, `delete_project_version`, `delete_test_suite`,
+  `delete_test_cases`. Each needs the target named again in `confirm`, and the client asks the person to confirm
+  when it supports MCP elicitation.
 
-```json
-{
-  "mcpServers": {
-    "qa-studio": {
-      "command": "node",
-      "args": ["services/qa-mcp/dist/server.js"],
-      "env": { "QA_API_URL": "http://127.0.0.1:5080" }
-    }
-  }
-}
-```
+Whatever is turned on, there is **no** tool to approve, edit or restore an approved scenario, or to change settings,
+keys, test accounts or connections. Approval stays with a person in the dashboard; the only automatic approval is
+the existing Azure DevOps job's rule (drafts that pass every check).
 
-If the platform has an access token (`QA_ADMIN_TOKEN`), add the same variable to `env`. Keep that file out of version
-control when it holds a token.
+**Resources:** `qa://actions`, `qa://docs/step-format`, `qa://projects/{projectId}`, `qa://test-cases/{caseId}` and
+`qa://runs/{runId}/report`. **Prompts** (slash commands in most clients): `generate-cases-from-requirement`,
+`automate-test-case`, `triage-failed-run`, `coverage-review`.
+
+### Connecting an assistant
+
+Start the platform (`qa-studio` or `npm start`) and build once (`npm run build` in `Backend/Worker`). The
+repository's `.mcp.json` registers the server for Claude Code. For other clients use the same command and variables:
+
+- **Claude Code**: the repository's `.mcp.json`, or
+  `claude mcp add qa-studio --env QA_API_URL=http://127.0.0.1:5080 -- node <repo>/Backend/Worker/services/qa-mcp/dist/server.js`
+- **Claude Desktop, Cursor, VS Code, Windsurf**: their MCP settings file, `mcpServers` → `qa-studio` →
+  `command: "node"`, `args: ["<repo>/Backend/Worker/services/qa-mcp/dist/server.js"]`, `env` as below.
+- **Gemini CLI**: `mcpServers` in `~/.gemini/settings.json` (or the project's `.gemini/settings.json`), same shape.
+- **Google Antigravity and other agents**: their MCP server settings, same command.
+
+Settings (environment variables):
+
+- `QA_API_URL`: the .NET API, default `http://127.0.0.1:5080`.
+- `QA_ADMIN_TOKEN`: the platform's access token, when it has one. Pass it from your environment; never commit it.
+- `QA_MCP_TOOLSETS`: see above.
+- `QA_MCP_PROJECT_ID`: the project to use when the assistant does not name one.
+- `QA_MCP_TRANSPORT=http` serves Streamable HTTP on `http://127.0.0.1:5090/mcp` (`QA_MCP_HTTP_PORT`) instead of
+  stdio, for clients that cannot start a process. It listens on this machine only, checks `Origin`, and requires
+  `Authorization: Bearer <QA_MCP_HTTP_TOKEN>` when that variable is set (set it). A shared server for other
+  machines needs per-user sign-in first (ADR 0013, open question 2).
+
+### Filing bugs in Azure DevOps
+
+With the `defects` toolset, `report_defect` files a Bug for a case that failed in a run. The platform builds the bug
+from the test case and the run (repro steps, failing step, expected and actual, evidence, screenshot), never from
+model text, and masks tokens. It refuses unless the case **also failed in an earlier run** (use
+`rerun_failed_cases`) and `diagnose_failed_case` said **likely-defect** for this run since the worker started. An
+open bug with the same failure gets a comment instead of a duplicate, a run files at most `maxBugsPerRun` new bugs
+(default 5), and every bug is in the audit trail (`azure-devops.defect`). The Personal Access Token needs **Work
+Items read & write** for this; import and publish keep working with the old scopes. Optional settings in the
+`azure-devops` config block: `bugAreaPath`, `bugIterationPath`, `bugSeverity`, `maxBugsPerRun`. They are not on the
+Settings page yet: set them with `PUT /api/azure-devops`; saving the Settings page keeps them.
+
+`pipelines/qa-agent.yml` is a template for an Azure Pipeline that runs an assistant with this server for a story or
+after a deployment. It needs a self-hosted agent that can reach the platform.
 
 ## Voice control
 

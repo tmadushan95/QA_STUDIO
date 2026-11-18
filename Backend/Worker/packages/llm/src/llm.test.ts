@@ -6,6 +6,7 @@ import {
   GeminiClient,
   LlmError,
   LlmGateway,
+  THINKING_HEADROOM,
   completeJson,
   createClient,
   extractJson,
@@ -176,6 +177,31 @@ describe('GeminiClient', () => {
     expect(body.contents.map((x: { role: string }) => x.role)).toEqual(['user', 'model']);
     expect(body.systemInstruction.parts[0].text).toBe('sys');
     expect(body.generationConfig.maxOutputTokens).toBe(20);
+    expect(body.generationConfig.thinkingConfig).toBeUndefined();
+  });
+
+  it('gives Gemini 3+ low thinking, room for it, and no temperature; 2.x is unchanged', async () => {
+    const bodyFor = async (model: string) => {
+      const seen: { url?: string; init?: RequestInit }[] = [];
+      await new GeminiClient({
+        apiKey: KEY,
+        model,
+        fetch: fetchReturning(
+          200,
+          { candidates: [{ content: { parts: [{ text: 'ok' }] } }] },
+          seen,
+        ),
+      }).complete({ messages: [{ role: 'user', content: 'q' }], maxTokens: 5, temperature: 0 });
+      return JSON.parse(String(seen[0]!.init!.body));
+    };
+    expect((await bodyFor('gemini-3.8-flash')).generationConfig).toEqual({
+      maxOutputTokens: 5 + THINKING_HEADROOM,
+      thinkingConfig: { thinkingLevel: 'low' },
+    });
+    expect((await bodyFor('gemini-2.5-flash')).generationConfig).toEqual({
+      maxOutputTokens: 5,
+      temperature: 0,
+    });
   });
 
   it('reports a blocked prompt and a quota error', async () => {

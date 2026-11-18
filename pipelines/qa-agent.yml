@@ -1,0 +1,135 @@
+# QA Studio agent pipeline (template; not yet run end to end, see docs/adr/0013).
+#
+# Runs an AI assistant (Claude Code, headless) with QA Studio's MCP server, either for one user story (write test
+# cases, automate them, run, triage, file bugs) or as a regression run after a deployment. The bug rules live in the
+# platform: a bug is filed only for a case that failed twice and was diagnosed as a likely defect.
+#
+# Needs:
+#   - a self-hosted agent pool that can reach QA Studio (Microsoft-hosted agents cannot reach a platform on localhost)
+#   - a variable group "qa-studio-agent", linked to Key Vault, with:
+#       QA_API_URL         the QA Studio .NET API, such as http://qa-studio.internal:5080
+#       QA_ADMIN_TOKEN     QA Studio's access token (secret)
+#       ANTHROPIC_API_KEY  the model key for Claude Code (secret)
+#   - QA Studio's Azure DevOps connection with a token that has Work Items read & write (for bugs)
+
+trigger: none
+
+parameters:
+  - name: mode
+    displayName: What to do
+    type: string
+    default: story
+    values: [story, regression]
+  - name: storyId
+    displayName: Story work item ID (story mode)
+    type: number
+    default: 0
+  - name: projectId
+    displayName: QA Studio project ID
+    type: number
+  - name: suiteId
+    displayName: QA Studio suite for new test cases (story mode)
+    type: number
+    default: 0
+  - name: caseIds
+    displayName: Test case IDs to run, comma separated (regression mode)
+    type: string
+    default: ''
+  - name: failOnDefect
+    displayName: Fail the pipeline when a new bug is filed
+    type: boolean
+    default: true
+
+pool:
+  name: QA-Studio
+
+variables:
+  - group: qa-studio-agent
+
+steps:
+  - checkout: self
+
+  - task: NodeTool@0
+    displayName: Use Node 22
+    inputs:
+      versionSpec: '22.x'
+
+  - script: npm ci && npx tsc -b services/qa-mcp
+    displayName: Build the MCP server
+    workingDirectory: Backend/Worker
+
+  - script: npm install -g @anthropic-ai/claude-code
+    displayName: Install Claude Code
+
+  - script: |
+      set -euo pipefail
+      # The MCP server sees only these toolsets: never admin (deletes).
+      cat > "$(Agent.TempDirectory)/qa-mcp.json" <<JSON
+      {
+        "mcpServers": {
+          "qa-studio": {
+            "command": "node",
+            "args": ["$(Build.SourcesDirectory)/Backend/Worker/services/qa-mcp/dist/server.js"],
+            "env": {
+              "QA_API_URL": "$QA_API_URL",
+              "QA_ADMIN_TOKEN": "$QA_ADMIN_TOKEN",
+              "QA_MCP_TOOLSETS": "read,author,operate,defects",
+              "QA_MCP_PROJECT_ID": "${{ parameters.projectId }}"
+            }
+          }
+        }
+      }
+      JSON
+      # Remember where the audit trail stands, to count the bugs this run files.
+      curl -fsS -H "Authorization: Bearer $QA_ADMIN_TOKEN" "$QA_API_URL/api/audit?limit=1" \
+        | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).items?.[0]?.id ?? 0))' \
+        > "$(Agent.TempDirectory)/audit-start"
+    displayName: Configure the MCP server
+    env:
+      QA_API_URL: $(QA_API_URL)
+      QA_ADMIN_TOKEN: $(QA_ADMIN_TOKEN)
+
+  - script: |
+      set -euo pipefail
+      if [ "${{ parameters.mode }}" = "story" ]; then
+        PROMPT="Work on Azure DevOps story ${{ parameters.storyId }} in QA Studio project ${{ parameters.projectId }}.
+      1. Read it with get_work_item.
+      2. Call propose_test_cases with its title, description and acceptance criteria, then add_test_cases for every proposal that matches an acceptance criterion (suiteId ${{ parameters.suiteId }}).
+      3. Call generate_scenario_drafts for the new cases and wait_for_ai_job. Drafts wait for a person to approve them; do not try to approve.
+      4. If any of the new cases already have approved automation, run them: plan_run, start_run, wait_for_run.
+      5. For each failed case: rerun_failed_cases, wait_for_run, then diagnose_failed_case on the rerun. Call report_defect (storyId ${{ parameters.storyId }}) only when it failed again and the verdict is likely-defect.
+      6. End with a short summary: cases added, drafts waiting for review, results, and bugs filed or commented."
+      else
+        PROMPT="Run a regression in QA Studio project ${{ parameters.projectId }} for these cases: ${{ parameters.caseIds }}.
+      1. plan_run, then start_run (in batches of 25) and wait_for_run.
+      2. For each failed case: rerun_failed_cases, wait_for_run, then diagnose_failed_case on the rerun. Call report_defect only when it failed again and the verdict is likely-defect.
+      3. End with a short summary of results and bugs filed or commented."
+      fi
+      claude -p "$PROMPT" \
+        --mcp-config "$(Agent.TempDirectory)/qa-mcp.json" \
+        --strict-mcp-config \
+        --allowedTools "mcp__qa-studio__*" \
+        | tee "$(Build.ArtifactStagingDirectory)/qa-agent-summary.md"
+    displayName: Run the QA agent
+    env:
+      ANTHROPIC_API_KEY: $(ANTHROPIC_API_KEY)
+
+  - script: |
+      set -euo pipefail
+      START=$(cat "$(Agent.TempDirectory)/audit-start")
+      FILED=$(curl -fsS -H "Authorization: Bearer $QA_ADMIN_TOKEN" "$QA_API_URL/api/audit?limit=500" \
+        | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const start=Number(process.argv[1]);const rows=(JSON.parse(s).items??[]).filter(r=>r.id>start&&r.action==="azure-devops.defect"&&/ filed /.test(r.detail));for(const r of rows)console.error(`${r.target}: ${r.detail}`);console.log(rows.length)})' "$START")
+      echo "New bugs filed: $FILED"
+      if [ "${{ parameters.failOnDefect }}" = "True" ] && [ "$FILED" -gt 0 ]; then
+        echo "##vso[task.logissue type=error]QA Studio filed $FILED new bug(s)."
+        exit 1
+      fi
+    displayName: Check for new defects
+    env:
+      QA_API_URL: $(QA_API_URL)
+      QA_ADMIN_TOKEN: $(QA_ADMIN_TOKEN)
+
+  - publish: $(Build.ArtifactStagingDirectory)/qa-agent-summary.md
+    artifact: qa-agent-summary
+    displayName: Keep the agent's summary
+    condition: always()

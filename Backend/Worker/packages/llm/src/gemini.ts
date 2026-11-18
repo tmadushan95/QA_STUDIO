@@ -9,6 +9,15 @@ export interface GeminiOptions {
   defaultTimeoutMs?: number;
 }
 
+/** Gemini 3 and later take `thinkingLevel`; 2.x models use a token budget instead and reject it. */
+export function thinksByLevel(model: string): boolean {
+  const major = /^(?:models\/)?gemini-(\d+)/i.exec(model)?.[1];
+  return major !== undefined && Number(major) >= 3;
+}
+
+/** Output tokens added for Gemini 3+ thinking on top of the answer budget a caller asks for. */
+export const THINKING_HEADROOM = 2048;
+
 /** Google Gemini `generateContent`. The key goes in a header, never in the URL, so it cannot end up in logs. */
 export class GeminiClient implements LlmClient {
   readonly provider = 'gemini' as const;
@@ -22,6 +31,7 @@ export class GeminiClient implements LlmClient {
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
     const base = this.o.baseUrl ?? 'https://generativelanguage.googleapis.com';
+    const thinking = thinksByLevel(this.o.model);
     const body = await postJson(
       this.fetchFn,
       `${base}/v1beta/models/${encodeURIComponent(this.o.model)}:generateContent`,
@@ -38,10 +48,18 @@ export class GeminiClient implements LlmClient {
             { text: m.content },
           ],
         })),
-        generationConfig: {
-          maxOutputTokens: req.maxTokens,
-          ...(req.temperature !== undefined && { temperature: req.temperature }),
-        },
+        generationConfig: thinking
+          ? {
+              // Gemini 3+: thinking counts toward maxOutputTokens, so a small answer budget was spent entirely on
+              // thinking ("no text"). Add room for it. Google advises leaving temperature at its default (lower
+              // values can make these models loop), so it is not sent. "low" thinking is their latency setting.
+              maxOutputTokens: req.maxTokens + THINKING_HEADROOM,
+              thinkingConfig: { thinkingLevel: 'low' },
+            }
+          : {
+              maxOutputTokens: req.maxTokens,
+              ...(req.temperature !== undefined && { temperature: req.temperature }),
+            },
       },
       {
         key: this.o.apiKey,

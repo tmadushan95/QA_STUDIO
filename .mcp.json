@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "qa-studio": {
+      "command": "node",
+      "args": ["Backend/Worker/services/qa-mcp/dist/server.js"],
+      "env": {
+        "QA_API_URL": "${QA_API_URL:-http://127.0.0.1:5080}",
+        "QA_ADMIN_TOKEN": "${QA_ADMIN_TOKEN:-}",
+        "QA_MCP_TOOLSETS": "${QA_MCP_TOOLSETS:-read,author,operate}"
+      }
+    }
+  }
+}

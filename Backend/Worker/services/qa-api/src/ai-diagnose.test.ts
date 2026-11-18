@@ -145,7 +145,7 @@ function setup(
     ...(explore && { explore }),
   });
   const app = createApp(undefined, { aiTasks: tasks });
-  return { app, fake, scenarios, live, kb, audit, runId };
+  return { app, fake, scenarios, live, kb, audit, runId, tasks };
 }
 
 const diagnose = (app: ReturnType<typeof createApp>, body: unknown) =>
@@ -181,7 +181,7 @@ describe('diagnose a failed case', () => {
   });
 
   it('reports a likely defect and changes nothing', async () => {
-    const { app, scenarios, runId, audit } = setup([
+    const { app, scenarios, runId, audit, tasks } = setup([
       JSON.stringify({
         verdict: 'likely-defect',
         explanation: 'The app shows a different title than the case expects.',
@@ -194,6 +194,10 @@ describe('diagnose a failed case', () => {
     });
     expect(scenarios.get('TC_06').draft).toBeUndefined();
     expect(audit.at(-1)).toContain('likely-defect');
+    // Remembered for defect filing, under the case's own result; another run or case has no verdict.
+    expect(tasks.lastVerdict(runId, 'TC_06')).toBe('likely-defect');
+    expect(tasks.lastVerdict('other-run', 'TC_06')).toBeUndefined();
+    expect(tasks.lastVerdict(runId, 'TC_07')).toBeUndefined();
   });
 
   it('only diagnoses failed cases of a known run that have a scenario', async () => {

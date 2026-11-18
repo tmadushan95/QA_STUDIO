@@ -1,6 +1,6 @@
 {
   "name": "@qa-studio/qa-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "dist/server.js",
@@ -13,5 +13,12 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
     "zod": "4.6.7"
+  },
+  "description": "QA Studio as an MCP server: test cases, automation drafts, runs and defects for any MCP client.",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.13"
   }
 }

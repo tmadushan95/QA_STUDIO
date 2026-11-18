@@ -11,6 +11,7 @@ import {
   RunMode,
   SCHEMA_VERSION,
   summarizeRun,
+  type Run,
   type Scenario,
   type TestCase,
 } from '@qa-studio/shared';
@@ -36,6 +37,7 @@ import type { SkillView } from './skills.js';
 import { HttpError } from './errors.js';
 import { EventBus, registerEvents } from './events.js';
 import { registerSecurity, type SecurityOptions } from './security.js';
+import { registerRequestClient } from './request-client.js';
 import type { ProjectConnectionView } from './project-connections.js';
 import type { SettingsView } from './settings.js';
 import type { ParameterApi } from './parameter-client.js';
@@ -282,6 +284,7 @@ export function createApp(
 ): FastifyInstance {
   const app = Fastify({ logger: false });
   registerSecurity(app, auth); // first, so the checks cover every route below
+  registerRequestClient(app);
   void app.register(multipart, { limits: { fileSize: DEFAULT_LIMITS.maxBytes, files: 1 } });
 
   app.setErrorHandler(
@@ -861,20 +864,33 @@ export function createApp(
     return { cancelled: automation.runs!.cancel(req.params.id) };
   });
 
-  // Only files that the run itself reported as artifacts can be fetched; the client never supplies a path to the disk.
+  /**
+   * The file on disk of an artifact the run itself reported, or undefined. The client never supplies a path to the
+   * disk: the name must be one of the run's artifacts and must resolve inside the run's own folder.
+   */
+  const artifactFile = (run: Run, rel: string): string | undefined => {
+    if (!run.cases.some((c) => c.artifacts.includes(rel)) || !automation.artifactsDir) {
+      return undefined;
+    }
+    const base = path.resolve(automation.artifactsDir, run.id);
+    const file = path.resolve(base, rel);
+    return file.startsWith(base + path.sep) && fs.existsSync(file) ? file : undefined;
+  };
+  // The failure screenshot of a case, for a bug report.
+  const readScreenshot = (runId: string, artifacts: string[]) => {
+    const run = automation.runs?.get(runId);
+    const rel = artifacts.find((a) => a.endsWith('.png'));
+    const file = run && rel ? artifactFile(run, rel) : undefined;
+    return file && rel ? { name: path.basename(rel), data: fs.readFileSync(file) } : undefined;
+  };
+
+  // Only files that the run itself reported as artifacts can be fetched.
   app.get<{ Params: { id: string }; Querystring: { path?: string } }>(
     '/api/runs/:id/artifact',
     (req, reply) => {
       const run = runOr404(req.params.id);
-      const rel = req.query.path ?? '';
-      if (!run.cases.some((c) => c.artifacts.includes(rel)) || !automation.artifactsDir) {
-        return reply
-          .code(404)
-          .send({ error: { code: 'not-found', message: 'Artifact not found.' } });
-      }
-      const base = path.resolve(automation.artifactsDir, run.id);
-      const file = path.resolve(base, rel);
-      if (!file.startsWith(base + path.sep) || !fs.existsSync(file)) {
+      const file = artifactFile(run, req.query.path ?? '');
+      if (!file) {
         return reply
           .code(404)
           .send({ error: { code: 'not-found', message: 'Artifact not found.' } });
@@ -1230,6 +1246,39 @@ export function createApp(
     return adoOr404().publishResults({ planId: b.planId, suiteId: b.suiteId, run });
   });
   app.get('/api/azure-devops/jobs', () => ({ items: adoOr404().jobsList() }));
+  app.get<{ Params: { id: string } }>('/api/azure-devops/work-items/:id', (req) =>
+    adoOr404().workItem(PlanParam.parse(req.params.id)),
+  );
+  // Files a bug for a failed case. The checks that keep flaky and out-of-date tests out need facts only this layer
+  // has: the run history (did it fail before?) and the latest diagnosis.
+  app.post('/api/azure-devops/defects', async (req) => {
+    const b = z
+      .object({
+        runId: z.string().min(1),
+        caseId: z.string().min(1),
+        account: z.string().optional(),
+        storyId: z.number().int().positive().optional(),
+      })
+      .parse(req.body ?? {});
+    const ado = adoOr404();
+    const run = automation.runs?.get(b.runId);
+    if (!run) throw new HttpError(404, 'unknown-run', 'There is no such run.');
+    const result = run.cases.find(
+      (c) => c.caseId === b.caseId && (b.account === undefined || c.account === b.account),
+    );
+    const failedBefore = (automation.runs?.list() ?? []).some(
+      (r) => r.id !== run.id && r.cases.some((c) => c.caseId === b.caseId && c.status === 'failed'),
+    );
+    return ado.reportDefect({
+      run,
+      caseId: b.caseId,
+      account: b.account,
+      storyId: b.storyId,
+      verdict: automation.aiTasks?.lastVerdict(run.id, b.caseId, result?.account),
+      failedBefore,
+      screenshot: readScreenshot(run.id, result?.artifacts ?? []),
+    });
+  });
   app.post('/api/azure-devops/pipeline', (req, reply) => {
     // The pipeline drives the same routes a person uses, so every check of a manual run applies unchanged.
     const call = async <T>(method: 'GET' | 'POST', url: string, payload?: unknown): Promise<T> => {

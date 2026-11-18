@@ -251,6 +251,8 @@
 }
 .workspace[data-docked] .chat {
   height: 100%;
+  /* Its height is fixed here, so the prompt box can be capped against it (cqh) instead of the whole window. */
+  container-type: size;
 }
 .thread {
   display: flex;
@@ -458,6 +460,10 @@
   font-size: var(--text-md);
   line-height: 1.55;
   resize: none;
+}
+/* Docked, a long prompt must not squeeze the conversation to a line on a short screen: cap it at a third of the chat. */
+.workspace[data-docked] .promptInput {
+  max-height: min(40vh, 20rem, 35cqh);
 }
 /* The box itself shows focus, so the text area inside does not draw a second ring. */
 .promptInput:focus-visible {

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using QaStudio.Application.Abstractions;
 using QaStudio.Infrastructure;
 using QaStudio.Infrastructure.Persistence;
 
@@ -24,6 +25,8 @@ public static class ApiCommonExtensions
         // Malformed bodies and route values become exceptions, so they get the same error shape as everything else.
         services.Configure<RouteHandlerOptions>(options => options.ThrowOnBadRequest = true);
         services.AddExceptionHandler<ApiExceptionHandler>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<IRequestClient, HttpRequestClient>();
         services.AddProblemDetails();
         return services;
     }

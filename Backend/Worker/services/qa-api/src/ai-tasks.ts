@@ -133,6 +133,11 @@ const ProposeOptionsSchema = z.object({
   spoken: z.boolean().optional(),
 });
 
+/** Diagnoses remembered for defect filing; a few runs' worth of failures. */
+const MAX_VERDICTS = 500;
+const verdictKey = (runId: string, caseId: string, account?: string) =>
+  `${runId}|${caseId}|${account ?? ''}`;
+
 /** Most files one generation request may carry. */
 export const MAX_ATTACHMENTS = 5;
 /** Largest image or PDF, as base64 (about 4 MB of file); the page scales screenshots down well below this. */
@@ -211,6 +216,11 @@ function toHttp(e: unknown): HttpError {
 export class AiTasks {
   private current: { job: GenerateJob; abort: AbortController } | undefined;
   private readonly history: GenerateJob[] = [];
+  /**
+   * The latest verdict per run, case and account, so filing a defect can insist the case was diagnosed as one.
+   * Kept in memory and bounded: after a restart the case is simply diagnosed again.
+   */
+  private readonly verdicts = new Map<string, Diagnosis['verdict']>();
 
   constructor(private readonly d: AiTasksDeps) {}
 
@@ -641,6 +651,7 @@ export class AiTasks {
       throw toHttp(e);
     }
     this.d.audit('ai.diagnose', caseId, `Run ${runId.slice(0, 8)}: ${diagnosis.verdict}.`);
+    this.remember(runId, caseId, account ?? result.account, diagnosis.verdict);
     if (diagnosis.verdict !== 'test-fix') return diagnosis;
     const draft = this.d.scenarios.saveDraft(caseId, {
       steps: diagnosis.steps,
@@ -652,6 +663,26 @@ export class AiTasks {
       explanation: diagnosis.explanation,
       draft: { version: draft.version, status: draft.status, issues: draft.issues },
     };
+  }
+
+  /** The verdict of the latest diagnosis of a case in a run, if it was diagnosed since the worker started. */
+  lastVerdict(runId: string, caseId: string, account?: string): Diagnosis['verdict'] | undefined {
+    return this.verdicts.get(verdictKey(runId, caseId, account));
+  }
+
+  private remember(
+    runId: string,
+    caseId: string,
+    account: string | undefined,
+    verdict: Diagnosis['verdict'],
+  ): void {
+    const key = verdictKey(runId, caseId, account);
+    this.verdicts.delete(key); // re-inserted last, so the oldest entry is the first to go
+    this.verdicts.set(key, verdict);
+    if (this.verdicts.size > MAX_VERDICTS) {
+      const oldest = this.verdicts.keys().next().value;
+      if (oldest !== undefined) this.verdicts.delete(oldest);
+    }
   }
 
   /** The page text captured when the case failed, read only from inside this run's evidence folder. */

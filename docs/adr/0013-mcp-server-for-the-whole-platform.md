@@ -1,6 +1,7 @@
 # 0013 — The MCP server covers the whole platform
 
-**Status:** proposed (2026-11-17). Extends the MCP section of [AI-AND-MCP.md](../AI-AND-MCP.md). Builds on
+**Status:** accepted (2026-11-18), phases 1–5 implemented; see "Implementation notes" for where the build differs
+from the plan and what is still open. Extends the MCP section of [AI-AND-MCP.md](../AI-AND-MCP.md). Builds on
 [0002](0002-typescript-only.md), [0005](0005-sql-server-and-dotnet-api.md) and [0010](0010-moving-worker-features-to-dotnet.md).
 
 ## Context
@@ -68,6 +69,8 @@ limits, the same way the current tools do.
 - Results: `list_runs` (filter by project and version), `get_run`, `get_run_report` (summary text from
   `/api/runs/{id}/report.md` when that format exists), `get_dashboard`, `get_insights`
 - AI: `list_ai_jobs`, `get_ai_job`, `list_skills`
+- Azure DevOps: `get_work_item` (a story's title, description and acceptance criteria, through the stored connection;
+  new worker route)
 - `list_audit`
 
 **Toolset `author` (on by default; writes stay reviewable)**
@@ -86,14 +89,24 @@ limits, the same way the current tools do.
 
 - `plan_run` (`/api/runs/plan`, shows what would run and what is blocked), `start_run` (the existing tool),
   `cancel_run`
+- `rerun_failed_cases` (runs the failed cases of a run once more, so a flaky failure is not reported as a defect)
+- `start_azure_devops_pipeline` (`/api/azure-devops/pipeline`, the existing import → convert → approve → parameters →
+  run → publish job) and `get_azure_devops_job` (`/api/azure-devops/jobs`)
+
+**Toolset `defects` (off by default; writes to Azure DevOps Boards)**
+
+- `report_defect` (new route, see "Filing bugs in Azure DevOps"): files or updates a Bug for one failed case of a run
+- `list_reported_defects`: the bugs QA Studio has filed, with their Azure DevOps state
 
 **Toolset `admin` (off by default; must be enabled explicitly)**
 
-- `delete_test_cases`, `delete_test_suite`, `delete_project_version`, `delete_project`, `cancel_ai_job`
+- `delete_test_cases`, `delete_test_suite`, `delete_project_version`, `delete_project` (`cancel_ai_job` ended up in
+  `author`; see "Implementation notes")
 - These need a `confirm` argument equal to the target's ID or name. They also use MCP elicitation when the client
   supports it, so the user sees a confirmation outside the model.
 
-**Never exposed, whatever the settings:** approving or restoring a scenario, settings, AI keys and model
+**Never exposed, whatever the settings:** approving or restoring a scenario directly (the only approval an agent can
+cause is the existing Azure DevOps pipeline job's rule, which approves only drafts that pass every check), settings, AI keys and model
 configuration, test accounts and passwords, Azure DevOps tokens, project connection strings, backups, sign-in and
 sign-out, `/internal/*`. The existing test that checks the tool list for approve, delete, setting and key words
 becomes a check run once per toolset.
@@ -155,6 +168,95 @@ Prompts are the platform's workflows, each one a ready-made instruction set that
   the MCP authorization spec, with per-user tokens. That is a separate decision, because the platform currently has one
   admin token and no users.
 
+## Where it runs
+
+The server holds no data, so it runs wherever the platform API can be reached. Azure DevOps builds, publishes and runs
+it in pipelines. It does not host a server that is always on.
+
+- **On each person's machine (phases 1–3).** The agent starts the server over stdio. A pipeline publishes the package
+  to an Azure Artifacts npm feed, so people install it with `npx @qa-studio/qa-mcp` and need no checkout.
+- **Inside an Azure Pipeline job (phase 5).** A headless agent starts the server for one run and it stops with the job.
+  See the next section.
+- **A shared server on Azure (phase 4 and later).** Azure Container Apps running the HTTP mode, next to a hosted
+  platform: the .NET API, the worker in a Playwright image and Azure SQL. It uses Microsoft Entra ID for OAuth and can
+  sit behind Azure API Management. This needs the platform to accept a non-loopback host, serve HTTPS and know its
+  users, so it waits on open question 2.
+
+## Agents in Azure Pipelines
+
+A pipeline runs an agent with no one at the keyboard (Claude Code with `-p`, Gemini CLI or any MCP client that can run
+without a person). The agent has this server and only the tools the job needs.
+
+**Triggers:** a user story moves to the state the team picks (for example "Ready for QA"), a pull request merges, or a
+build is deployed to the QA environment.
+
+**Flow for a story:**
+
+1. Read the story's acceptance criteria. The pipeline passes them in, or `get_work_item` reads them (this needs the
+   Work Items read scope the connection already has).
+2. `propose_test_cases`, then `add_test_cases` under the project, suite and version the pipeline names.
+3. `generate_scenario_drafts`, then `validate_scenario`. Approval follows the existing Azure DevOps job rule: a draft is
+   approved only when every check passes. Drafts that fail stay drafts and are listed in the job summary for a person.
+4. `auto_fill_parameters`, then `start_run`, then `get_run`.
+5. For each failed case: `rerun_failed_cases` once. If it still fails, call `diagnose_failed_case`.
+6. If the diagnosis is "likely defect", call `report_defect`. If it is "out-of-date test", the corrected draft waits
+   for review and no bug is filed.
+7. Publish the results to Test Plans (the existing publish stage) and write a summary to the pipeline log.
+
+**Flow for a deployment:** the same as steps 4 to 7, for the approved cases of the deployed project version.
+`start_azure_devops_pipeline` already does the import-to-publish part as one job.
+
+**Pipeline setup:**
+
+- The job runs on a **self-hosted agent** that can reach the platform, or the platform is hosted (see "Where it runs").
+  Microsoft-hosted agents cannot reach a platform on `localhost`.
+- The model key, `QA_ADMIN_TOKEN` and `QA_API_URL` come from a variable group linked to Key Vault. They are never
+  written in the YAML.
+- The agent is limited to this server's tools (for example `--allowedTools "mcp__qa-studio__*"` for Claude Code) and
+  to the toolsets `read,author,operate,defects`. It never gets `admin`.
+- The job fails when the platform reports an error. A failed test does not fail the job; a filed defect does, so a
+  build cannot pass with open new defects. The team can change this per pipeline.
+- A template file, `pipelines/qa-agent.yml`, ships with the repository. It is not tested until phase 5.
+
+## Filing bugs in Azure DevOps
+
+The bug comes from the platform, not from text the model writes. The agent passes only the run ID and case ID.
+
+**New route (worker, in `azure-devops.ts`):** `POST /api/azure-devops/defects` with `{ runId, caseId }`. It reuses
+the stored connection and the encrypted token. The token needs **Work Items read & write** in addition to the scopes
+it has today. The Settings page must say so, and connecting with the old scope must still work for import and publish.
+
+**What the bug contains:**
+
+- Title: `[QA Studio] <case ID> <case title>: <failing step action>`
+- Repro steps: the case's preconditions and its steps up to and including the failing one, with the parameter values
+  (secrets removed, the same filter that is used before calling a model)
+- The expected result, the actual failure message and the diagnosis summary
+- Links to the run in QA Studio and to its screenshot or trace. Attachments are added when the run has them, within
+  a size cap.
+- Linked work items: the Azure DevOps test case (for `ADO-<id>` cases) and the story that started the pipeline,
+  when known
+- Area path, iteration and severity from the connection's defaults, and tags `qa-studio` and `ai-filed`
+- State New, left for a person to triage
+
+**Rules:**
+
+- **Only real defects.** The route refuses a case that did not fail twice, or whose latest diagnosis is not "likely
+  defect".
+- **No duplicates.** A failure signature is made from the case ID, the failing step and the normalised failure
+  message. If an open bug with that signature exists, the route adds a comment with the new run instead of filing
+  another bug.
+- **A cap.** At most N new bugs per run (a setting, default 5). After that the summary lists the rest for a person.
+- **Recorded.** Every filed or commented bug is written to the audit trail, with the actor `mcp` and the bug ID.
+  `list_reported_defects` reads them from there.
+
+**Rejected: giving the agent Microsoft's Azure DevOps MCP server and letting it write bugs itself.** That is less
+code, but the content and the duplicate check would depend on the model, the bugs would not be in the audit trail,
+and agents without that server could not file bugs at all.
+
+**Not in this decision:** pushing AI-created test cases to Azure DevOps Test Plans. Sync is one-way today (Azure
+DevOps to QA Studio). Writing test case work items back is a separate decision.
+
 ## Testing
 
 - Extend `tools.test.ts` (the fake API plus `InMemoryTransport`): one test per tool for the route, method, body, the
@@ -167,6 +269,10 @@ Prompts are the platform's workflows, each one a ready-made instruction set that
 - A small agent eval: about ten realistic requests (for example "automate TC_12", "why did the last run fail?", "add
   cases for the login requirement") run through Claude Code. Check that the right tools are picked and no
   out-of-scope write happens.
+- Defect filing: worker tests with a fake Azure DevOps API for the refusal rules (did not fail twice, not a likely
+  defect), the duplicate comment, the cap, secret removal from repro steps, and an old token without write scope.
+- Pipeline: one run of `pipelines/qa-agent.yml` on a self-hosted agent against a test Azure DevOps project, ending with
+  a filed bug and a duplicate run that only adds a comment.
 
 ## Phases
 
@@ -179,6 +285,9 @@ Prompts are the platform's workflows, each one a ready-made instruction set that
    AI-AND-MCP.md.
 4. **Admin toolset and HTTP.** Confirmed deletes with elicitation, Streamable HTTP on loopback, and a decision on
    remote OAuth.
+5. **Azure Pipelines and defects.** The `defects` route and toolset, `get_work_item`, `rerun_failed_cases`, the
+   Azure DevOps job tools, publishing the package to Azure Artifacts, and the `pipelines/qa-agent.yml` template. It
+   needs phases 1–3, not phase 4, because a pipeline uses stdio on a self-hosted agent.
 
 Each phase leaves `npm run check` (typecheck, lint, tests) green in `Backend/Worker` and changes nothing in the web
 app.
@@ -194,9 +303,39 @@ app.
 - Each new API endpoint now raises the question "should this be a tool?". The route contract test only catches routes
   that were removed or renamed, not new ones that are missing.
 
+## Implementation notes (2026-11-18)
+
+Built as planned, with these differences:
+
+- **Long jobs:** `wait_for_run` and `wait_for_ai_job` poll the API every 3 seconds (up to 15 minutes) and send
+  `notifications/progress` when the client asks for progress. They do not follow `/api/events`: polling the same
+  routes is simpler, works through the gateway unchanged, and is enough for jobs that take seconds to minutes.
+- **Results:** every tool returns `structuredContent` beside the text, but declares no `outputSchema`. A declared
+  schema makes the SDK reject any answer that differs from it, and the platform's answers are richer than the
+  summaries; adding schemas tool by tool is a follow-up.
+- **Schema compatibility:** a test fails the build if any tool's input schema uses `anyOf`, `oneOf`, `allOf` or
+  `$ref`, which Gemini-based clients reject. Parameter values are therefore plain strings (an empty string clears a
+  value) instead of nullable ones.
+- **Toolsets:** `cancel_ai_job` is in `author` (it stops a job; it deletes nothing). `validate_scenario`,
+  `suggest_*_parameters` and `propose_test_cases` save nothing and are marked read-only.
+- **Secrets:** parameter answers mask values whose name looks secret (`[hidden]`), with the same pattern the API
+  uses when guessing values.
+- **Audit:** both backends append `(via mcp)` to the detail of changes a request with `X-QA-Client: mcp/…` causes,
+  instead of a new actor column, so no migration was needed. The worker carries the client through background work
+  started by the request (AsyncLocalStorage); the API reads the header per request (`IRequestClient`).
+- **Defects:** the latest diagnosis per run and case is remembered in memory (bounded); after a worker restart a case
+  must be diagnosed again before a bug is filed. The bug settings (`bugAreaPath`, `bugIterationPath`, `bugSeverity`,
+  `maxBugsPerRun`) are API-only for now, and saving the Settings page keeps them.
+- **Not done:** the `.mcpb` bundle for Claude Desktop (the server is registered by command instead), OAuth for a
+  shared remote server (open question 2), and an end-to-end run of `pipelines/qa-agent.yml`. The route contract test
+  checks that every route a tool calls exists; the "agent eval" is still manual.
+
 ## Open questions
 
 1. Should the admin toolset (deletes) exist at all, or should deletion stay in the dashboard only?
 2. Is a shared or remote server needed (team members, claude.ai)? If so, user identity and OAuth come first.
 3. Does the worker's `/api/inventory` have any remaining role, or can it be retired under ADR 0010 once the MCP server
    stops calling it?
+4. Should a filed defect fail the pipeline by default, or only be reported?
+5. Which Azure DevOps state should trigger the story flow, and should AI-created test cases also be written back to
+   Test Plans (a separate decision)?

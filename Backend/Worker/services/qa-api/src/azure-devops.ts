@@ -8,13 +8,15 @@
  * - **Automate end to end**: import → convert the written steps into runnable steps → approve the ones that check out →
  *   fill missing parameters → run → publish each result back to Azure DevOps as a test run on the plan's test points.
  *   Every stage is a step of one job with live progress, and a stage that cannot go on stops the job with a reason.
+ * - **Report defects**: a case that failed twice and was diagnosed as a likely defect becomes a Bug, built from the
+ *   run's own evidence (never from model text), with a duplicate check and a cap per run. Needs Work Items write.
  *
  * The pipeline drives the same HTTP routes a person uses (through `PipelineHost`), so every safety rule of a manual
  * run (allowed environments, project readiness, accounts, destructive steps) applies unchanged.
  */
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { SCHEMA_VERSION, type Run, type TestCase } from '@qa-studio/shared';
+import { redact, SCHEMA_VERSION, type Run, type TestCase } from '@qa-studio/shared';
 import { HttpError } from './errors.js';
 
 /** Config block with the connection and pipeline defaults (no secret). */
@@ -60,8 +62,17 @@ const Config = z.object({
   autoApprove: z.boolean().default(true),
   autoParameters: z.boolean().default(true),
   publishResults: z.boolean().default(true),
+  /** Where filed bugs go; Azure DevOps uses the project's defaults when left out. */
+  bugAreaPath: z.string().trim().max(400).optional(),
+  bugIterationPath: z.string().trim().max(400).optional(),
+  /** Such as "3 - Medium". */
+  bugSeverity: z.string().trim().max(50).optional(),
+  /** New bugs one run may file; the rest are left for a person. */
+  maxBugsPerRun: z.number().int().min(1).max(50).optional(),
 });
 export type AzureDevOpsConfig = z.infer<typeof Config>;
+/** Settings only an API call sets for now; see `update`. */
+const BUG_SETTINGS = ['bugAreaPath', 'bugIterationPath', 'bugSeverity', 'maxBugsPerRun'] as const;
 
 const Target = z.object({
   planId: z.number().int().positive(),
@@ -90,6 +101,50 @@ export interface SuiteItem {
   name: string;
   parentId?: number;
 }
+
+/** A work item as an assistant reads it: plain text, line breaks kept. */
+export interface WorkItemView {
+  id: number;
+  type: string;
+  state: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: string;
+  tags: string[];
+  areaPath?: string;
+  iterationPath?: string;
+  url: string;
+}
+
+/** Everything the HTTP layer knows about the failure being reported. */
+export interface DefectInput {
+  run: Run;
+  caseId: string;
+  account?: string | undefined;
+  /** The work item (usually the story under test) to link the bug to. */
+  storyId?: number | undefined;
+  /** Verdict of the latest diagnosis of this case in this run, if any. */
+  verdict: string | undefined;
+  /** Whether the same case also failed in another run, so a flaky failure is not reported. */
+  failedBefore: boolean;
+  /** The failure screenshot, when the run kept one. */
+  screenshot?: { name: string; data: Buffer } | undefined;
+}
+
+export interface DefectOutcome {
+  action: 'filed' | 'commented';
+  bugId: number;
+  url: string;
+  signature: string;
+}
+
+/** New bugs one run may file when the settings do not say. */
+export const DEFAULT_MAX_BUGS_PER_RUN = 5;
+/** Largest screenshot attached to a bug. */
+const MAX_SCREENSHOT_BYTES = 4 * 1024 * 1024;
+/** States in which a bug no longer counts as open for the duplicate check. */
+const CLOSED_STATES = ['Closed', 'Done', 'Removed', 'Resolved'];
+const PATCH_JSON = 'application/json-patch+json';
 
 export interface ImportOutcome {
   added: number;
@@ -215,6 +270,40 @@ function priorityOf(value: unknown): string | undefined {
   return undefined;
 }
 
+/** Rich text (HTML) to plain text that keeps paragraphs and list items on their own lines. */
+export function multilineText(html: string | undefined): string {
+  if (!html) return '';
+  return decodeEntities(
+    html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '- ')
+      .replace(/<\/(p|div|li|h\d)>/gi, '\n')
+      .replace(/<[^>]+>/g, ''),
+  )
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * What makes two failures "the same bug": the case, the failing step and the message with its numbers taken out (so
+ * a changed count or timeout does not make a new bug). Stored on the bug as a tag.
+ */
+export function defectSignature(caseId: string, action: string, message: string): string {
+  const normalised = message
+    .toLowerCase()
+    .replace(/\d+/g, '#')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300);
+  const hash = createHash('sha256').update(`${caseId}|${action}|${normalised}`).digest('hex');
+  return `qa-sig-${hash.slice(0, 12)}`;
+}
+
 /** QA Studio result → Azure DevOps test outcome. */
 export function outcomeOf(status: string): 'Passed' | 'Failed' | 'Blocked' | 'NotExecuted' {
   if (status === 'passed') return 'Passed';
@@ -229,6 +318,8 @@ const RANK: Record<string, number> = { failed: 4, blocked: 3, cancelled: 2, skip
 export class AzureDevOpsService {
   private readonly jobs: PipelineJob[] = [];
   private active: PipelineJob | undefined;
+  /** New bugs filed per run, for the cap. In memory: after a restart the count starts again. */
+  private readonly filed = new Map<string, number>();
 
   constructor(private readonly d: AzureDevOpsDeps) {}
 
@@ -271,7 +362,14 @@ export class AzureDevOpsService {
         Object.fromEntries(p.error.issues.map((i) => [i.path.join('.'), i.message])),
       );
     }
-    this.d.store.saveConfig(CONFIG_KEY, p.data);
+    // The Settings page does not show the bug settings yet, so a save that leaves them out keeps the current ones.
+    const current = this.config();
+    const kept = Object.fromEntries(
+      BUG_SETTINGS.flatMap((k) =>
+        current?.[k] !== undefined && p.data[k] === undefined ? [[k, current[k]]] : [],
+      ),
+    );
+    this.d.store.saveConfig(CONFIG_KEY, { ...kept, ...p.data });
     this.d.audit('azure-devops.update', p.data.project, 'Azure DevOps settings saved.');
     return this.view();
   }
@@ -324,7 +422,10 @@ export class AzureDevOpsService {
           Accept: 'application/json',
           ...(body !== undefined && { 'Content-Type': contentType }),
         },
-        ...(body !== undefined && { body: JSON.stringify(body) }),
+        // Raw bytes (an attachment) go as they are; everything else is JSON.
+        ...(body !== undefined && {
+          body: body instanceof Uint8Array ? body : JSON.stringify(body),
+        }),
         signal: AbortSignal.timeout(30_000),
       });
     } catch {
@@ -400,6 +501,220 @@ export class AzureDevOpsService {
       `testplan/Plans/${planId}/Suites/${suiteId}/TestCase`,
     );
     return [...new Set((r.value ?? []).flatMap((v) => (v.workItem?.id ? [v.workItem.id] : [])))];
+  }
+
+  // ---------- work items and defects ----------
+
+  /** A work item (a story, usually) with its acceptance criteria. Needs only Work Items read. */
+  async workItem(id: number): Promise<WorkItemView> {
+    const r = await this.call<{ id: number; fields?: Record<string, unknown> }>(
+      'GET',
+      `wit/workitems/${id}?fields=System.WorkItemType,System.State,System.Title,System.Description,Microsoft.VSTS.Common.AcceptanceCriteria,System.Tags,System.AreaPath,System.IterationPath`,
+    );
+    const f = r.fields ?? {};
+    const text = (key: string) => {
+      const v = f[key];
+      return typeof v === 'string' ? v : undefined;
+    };
+    const areaPath = text('System.AreaPath');
+    const iterationPath = text('System.IterationPath');
+    return {
+      id: r.id,
+      type: text('System.WorkItemType') ?? '',
+      state: text('System.State') ?? '',
+      title: plainText(text('System.Title')),
+      description: multilineText(text('System.Description')),
+      acceptanceCriteria: multilineText(text('Microsoft.VSTS.Common.AcceptanceCriteria')),
+      tags: (text('System.Tags') ?? '')
+        .split(';')
+        .map((t) => t.trim())
+        .filter(Boolean),
+      ...(areaPath && { areaPath }),
+      ...(iterationPath && { iterationPath }),
+      url: this.editUrl(r.id),
+    };
+  }
+
+  /**
+   * File a Bug for a failed case, or comment on the open bug that already has the same failure. Refused unless the
+   * case failed twice and its diagnosis says the app is likely wrong, so a flaky or out-of-date test never becomes a
+   * bug. The content comes from the test case and the run, never from model text.
+   */
+  async reportDefect(input: DefectInput): Promise<DefectOutcome> {
+    const { run, caseId } = input;
+    const result = run.cases.find(
+      (c) => c.caseId === caseId && (input.account === undefined || c.account === input.account),
+    );
+    if (!result) throw new HttpError(404, 'unknown-case', `Run has no result for ${caseId}.`);
+    this.assertReportable(caseId, result.status, input);
+
+    const failedStep = result.steps.find((s) => s.status === 'failed');
+    const failure = this.failureOf(result.failure ?? failedStep?.failure);
+    const action = failedStep?.action ?? 'unknown step';
+    const signature = defectSignature(caseId, action, failure.message);
+    const runLabel = `run ${run.id.slice(0, 8)}${result.account ? ` as ${result.account}` : ''}`;
+
+    const duplicate = await this.openBugWith(signature);
+    if (duplicate !== undefined) {
+      // Same failure already reported and still open: add the new evidence there instead of filing again.
+      await this.call(
+        'PATCH',
+        `wit/workitems/${duplicate}`,
+        [
+          {
+            op: 'add',
+            path: '/fields/System.History',
+            value: `Failed again in QA Studio ${escapeHtml(runLabel)} (${escapeHtml(run.createdAt)}): ${escapeHtml(failure.message)}`,
+          },
+        ],
+        PATCH_JSON,
+      );
+      this.d.audit(
+        'azure-devops.defect',
+        caseId,
+        `Bug ${duplicate} commented: failed again in ${runLabel}.`,
+      );
+      return { action: 'commented', bugId: duplicate, url: this.editUrl(duplicate), signature };
+    }
+
+    const config = this.config();
+    const cap = config?.maxBugsPerRun ?? DEFAULT_MAX_BUGS_PER_RUN;
+    const count = this.filed.get(run.id) ?? 0;
+    if (count >= cap) {
+      throw new HttpError(
+        429,
+        'defect-cap',
+        `This run already filed ${count} bugs (the limit is ${cap}). List the remaining failures for a person instead.`,
+      );
+    }
+
+    const testCase = this.d.inventory.get(caseId);
+    const title = `[QA Studio] ${caseId} ${testCase?.title ?? result.title ?? ''}: ${action}`
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 255);
+    const steps = (testCase?.steps ?? [])
+      .map(
+        (s) =>
+          `<li>${escapeHtml(s.action)}${s.expected ? ` <i>Expected: ${escapeHtml(s.expected)}</i>` : ''}</li>`,
+      )
+      .join('');
+    const repro = [
+      `<p>Found by QA Studio in ${escapeHtml(runLabel)} on ${escapeHtml(run.environment)} (${escapeHtml(run.browser)}), ${escapeHtml(run.createdAt)}. It failed again after a rerun and was diagnosed as a likely defect.</p>`,
+      testCase?.preconditions
+        ? `<p><b>Preconditions:</b> ${escapeHtml(testCase.preconditions)}</p>`
+        : '',
+      steps ? `<p><b>Steps:</b></p><ol>${steps}</ol>` : '',
+      `<p><b>Failing step:</b> ${escapeHtml(failedStep?.description ?? action)}</p>`,
+      `<p><b>Expected:</b> ${escapeHtml(failure.expected ?? testCase?.expectedResult ?? 'see the test case')}</p>`,
+      `<p><b>Actual:</b> ${escapeHtml(failure.actual ?? failure.message)}</p>`,
+      `<p><b>Evidence:</b> QA Studio › Runs › ${escapeHtml(run.id)}${result.artifacts.length ? ` (${result.artifacts.map(escapeHtml).join(', ')})` : ''}</p>`,
+    ].join('');
+
+    const field = (path: string, value: string | undefined) =>
+      value ? [{ op: 'add', path: `/fields/${path}`, value }] : [];
+    const link = (rel: string, url: string) => [
+      { op: 'add', path: '/relations/-', value: { rel, url } },
+    ];
+    const workItemUrl = (id: number) => `${config?.orgUrl ?? ''}/_apis/wit/workItems/${id}`;
+    const testCaseWorkItem = /^ADO-(\d+)$/.exec(caseId)?.[1];
+    const attachment = await this.uploadScreenshot(input.screenshot);
+
+    const bug = await this.call<{ id: number }>(
+      'POST',
+      'wit/workitems/$Bug',
+      [
+        ...field('System.Title', title),
+        ...field('Microsoft.VSTS.TCM.ReproSteps', repro),
+        ...field('System.Tags', `qa-studio; ai-filed; ${signature}`),
+        ...field('Microsoft.VSTS.Common.Severity', config?.bugSeverity),
+        ...field('System.AreaPath', config?.bugAreaPath),
+        ...field('System.IterationPath', config?.bugIterationPath),
+        ...(testCaseWorkItem
+          ? link('Microsoft.VSTS.Common.TestedBy-Forward', workItemUrl(Number(testCaseWorkItem)))
+          : []),
+        ...(input.storyId ? link('System.LinkTypes.Related', workItemUrl(input.storyId)) : []),
+        ...(attachment ? link('AttachedFile', attachment) : []),
+      ],
+      PATCH_JSON,
+    );
+    this.filed.set(run.id, count + 1);
+    this.d.audit('azure-devops.defect', caseId, `Bug ${bug.id} filed from ${runLabel}.`);
+    return { action: 'filed', bugId: bug.id, url: this.editUrl(bug.id), signature };
+  }
+
+  /** The rules that keep flaky and out-of-date tests out of the bug tracker. */
+  private assertReportable(caseId: string, status: string, input: DefectInput): void {
+    if (status !== 'failed') {
+      throw new HttpError(
+        409,
+        'not-failed',
+        `${caseId} did not fail in this run; there is nothing to report.`,
+      );
+    }
+    if (!input.failedBefore) {
+      throw new HttpError(
+        409,
+        'not-confirmed',
+        `${caseId} has failed only once. Run it again (rerun_failed_cases); a bug is filed only for a case that fails twice.`,
+      );
+    }
+    if (input.verdict !== 'likely-defect') {
+      throw new HttpError(
+        409,
+        'not-a-defect',
+        input.verdict
+          ? `The diagnosis of ${caseId} in this run is "${input.verdict}", not a likely defect; no bug is filed.`
+          : `Diagnose ${caseId} in this run first (diagnose_failed_case); a bug is filed only for a likely defect.`,
+      );
+    }
+  }
+
+  /** The recorded failure with any token masked, or a placeholder when the run did not record one. */
+  private failureOf(raw: unknown): {
+    message: string;
+    expected?: string | undefined;
+    actual?: string | undefined;
+  } {
+    const f = z
+      .object({
+        message: z.string(),
+        expected: z.string().optional(),
+        actual: z.string().optional(),
+      })
+      .safeParse(redact(raw));
+    return f.success ? f.data : { message: 'The run did not record why.' };
+  }
+
+  /** The newest open bug carrying this failure signature. */
+  private async openBugWith(signature: string): Promise<number | undefined> {
+    const states = CLOSED_STATES.map((s) => `'${s}'`).join(', ');
+    const r = await this.call<{ workItems?: { id: number }[] }>('POST', 'wit/wiql', {
+      query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.WorkItemType] = 'Bug' AND [System.Tags] CONTAINS '${signature}' AND [System.State] NOT IN (${states}) ORDER BY [System.Id] DESC`,
+    });
+    return r.workItems?.[0]?.id;
+  }
+
+  private editUrl(id: number): string {
+    const config = this.config();
+    return `${config?.orgUrl ?? ''}/${encodeURIComponent(config?.project ?? '')}/_workitems/edit/${id}`;
+  }
+
+  /** Uploads the failure screenshot; a missing, oversized or refused one leaves the bug without it. */
+  private async uploadScreenshot(shot: DefectInput['screenshot']): Promise<string | undefined> {
+    if (!shot || shot.data.length === 0 || shot.data.length > MAX_SCREENSHOT_BYTES)
+      return undefined;
+    try {
+      const r = await this.call<{ url?: string }>(
+        'POST',
+        `wit/attachments?fileName=${encodeURIComponent(shot.name)}`,
+        shot.data,
+        'application/octet-stream',
+      );
+      return r.url;
+    } catch {
+      return undefined; // the bug matters more than its picture
+    }
   }
 
   // ---------- import ----------

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using QaStudio.Application.Abstractions;
 using QaStudio.Infrastructure.Persistence;
@@ -48,6 +49,8 @@ public static class DependencyInjection
         });
 
         services.AddSingleton<IClock, SystemClock>();
+        // Hosts without HTTP requests (tests, tools) have no client; the API replaces this with the request header.
+        services.TryAddSingleton<IRequestClient, NoRequestClient>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<ITestSuiteRepository, TestSuiteRepository>();
@@ -92,6 +95,12 @@ public static class DependencyInjection
         .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromMilliseconds(500) });
         return services;
     }
+}
+
+/// <summary>No client: requests that do not come over HTTP.</summary>
+internal sealed class NoRequestClient : IRequestClient
+{
+    public string? Name => null;
 }
 
 /// <summary>The real clock.</summary>
